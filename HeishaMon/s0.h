@@ -3,6 +3,7 @@
 #define NUM_S0_COUNTERS 2
 #define DEFAULT_S0_PIN_1 12  // S0_1 pin, for now a static config - should be in config menu later
 #define DEFAULT_S0_PIN_2 14  // S0_2 pin, for now a static config - should be in config menu later
+#define MINREPORTEDS0TIME 5 // how often s0 Watts are reported (not faster than this)
 
 struct s0SettingsStruct {
   byte gpiopin = 255;
@@ -20,6 +21,5 @@ struct s0DataStruct {
 
 void initS0Sensors(s0SettingsStruct s0Settings[], PubSubClient &mqtt_client, char* mqtt_topic_base);
 void restore_s0_Watthour(int s0Port, float watthour);
-void s0Loop(PubSubClient &mqtt_client, void (*log_message)(char*), char* mqtt_topic_base, s0SettingsStruct s0Settings[]);
-String s0TableOutput(void);
+void s0Timer(uint8_t i, PubSubClient &mqtt_client, void (*log_message)(char*), char* mqtt_topic_base, s0SettingsStruct s0Settings[]);String s0TableOutput(void);
 String s0JsonOutput(void);

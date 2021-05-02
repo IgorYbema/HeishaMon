@@ -61,7 +61,7 @@ String getUptime() {
   if (millis() < last_uptime) {
     ++uptime_overflows;
   }
-  last_uptime             = millis();
+  last_uptime = millis();
   uint32_t t = uptime_overflows * (UPTIME_OVERFLOW / 1000) + (last_uptime / 1000);
 
   char     uptime[200];
@@ -249,10 +249,7 @@ void setupWifi(DoubleResetDetect &drd, settingsStruct *heishamonSettings) {
   }
   else if (!wifiManager.autoConnect("HeishaMon-Setup")) {
     Serial.println(F("failed to connect and hit timeout"));
-    delay(3000);
-    //reset and try again, or maybe put it to deep sleep
-    ESP.reset();
-    delay(5000);
+    return;
   }
 
   //if you get here you have connected to the WiFi

@@ -21,13 +21,9 @@ int dallasDevicecount = 0;
 unsigned long nextalldatatime_dallas = 0;
 
 unsigned long dallasTimer = 0;
-unsigned int updateAllDallasTime = 30000; // will be set using heishmonSettings
-unsigned int dallasTimerWait = 30000; // will be set using heishmonSettings
 
 void initDallasSensors(void (*log_message)(char*), unsigned int updateAllDallasTimeSettings, unsigned int dallasTimerWaitSettings) {
   char log_msg[256];
-  updateAllDallasTime = updateAllDallasTimeSettings;
-  dallasTimerWait = dallasTimerWaitSettings;
   DS18B20.begin();
   dallasDevicecount  = DS18B20.getDeviceCount();
   sprintf_P(log_msg, PSTR("Number of 1wire sensors on bus: %d"), dallasDevicecount); log_message(log_msg);
@@ -55,16 +51,25 @@ void initDallasSensors(void (*log_message)(char*), unsigned int updateAllDallasT
   if (DALLASASYNC) DS18B20.setWaitForConversion(false); //async 1wire during next loops
 }
 
+void broadcastDallasTemp(PubSubClient &mqtt_client, void (*log_message)(char*), char* mqtt_topic_base) {
+  char log_msg[256];
+  char mqtt_topic[256];
+  char valueStr[20];
+
+  for (int i = 0; i < dallasDevicecount; i++) {
+    sprintf(log_msg, PSTR("Received 1wire sensor temperature (%s): %.2f"), actDallasData[i].address, actDallasData[i].temperature);
+    log_message(log_msg);
+    sprintf(valueStr, "%.2f", actDallasData[i].temperature);
+    sprintf(mqtt_topic, "%s/%s/%s", mqtt_topic_base, mqtt_topic_1wire, actDallasData[i].address);
+    mqtt_client.publish(mqtt_topic, valueStr, MQTT_RETAIN_VALUES);
+  }
+}
+
 void readNewDallasTemp(PubSubClient &mqtt_client, void (*log_message)(char*), char* mqtt_topic_base) {
   char log_msg[256];
   char mqtt_topic[256];
   char valueStr[20];
-  bool updatenow = false;
 
-  if (millis() > nextalldatatime_dallas) {
-    updatenow = true;
-    nextalldatatime_dallas = millis() + (1000 * updateAllDallasTime);
-  }
   if (!(DALLASASYNC)) DS18B20.requestTemperatures();
   for (int i = 0; i < dallasDevicecount; i++) {
     float temp = DS18B20.getTempC(actDallasData[i].sensor);
@@ -77,26 +82,16 @@ void readNewDallasTemp(PubSubClient &mqtt_client, void (*log_message)(char*), ch
         log_message(log_msg);
       } else {
         actDallasData[i].lastgoodtime = millis();
-        if ((updatenow) || (actDallasData[i].temperature != temp )) {  //only update mqtt topic if temp changed or after each update timer
+        if ((actDallasData[i].temperature != temp )) {  //only update mqtt topic if temp changed or after each update timer
           actDallasData[i].temperature = temp;
           sprintf(log_msg, PSTR("Received 1wire sensor temperature (%s): %.2f"), actDallasData[i].address, actDallasData[i].temperature);
           log_message(log_msg);
           sprintf(valueStr, "%.2f", actDallasData[i].temperature);
-          sprintf(mqtt_topic, "%s/%s/%s", mqtt_topic_base, mqtt_topic_1wire, actDallasData[i].address); mqtt_client.publish(mqtt_topic, valueStr, MQTT_RETAIN_VALUES);
+          sprintf(mqtt_topic, "%s/%s/%s", mqtt_topic_base, mqtt_topic_1wire, actDallasData[i].address);
+          mqtt_client.publish(mqtt_topic, valueStr, MQTT_RETAIN_VALUES);
         }
       }
     }
-  }
-}
-
-void dallasLoop(PubSubClient &mqtt_client, void (*log_message)(char*), char* mqtt_topic_base) {
-  if ((DALLASASYNC) && (millis() > (dallasTimer - 1000))) {
-    DS18B20.requestTemperatures(); // get temperatures for next run 1 second before getting the temperatures (async)
-  }
-  if (millis() > dallasTimer) {
-    log_message((char*)"Requesting new 1wire temperatures");
-    dallasTimer = millis() + (1000 * dallasTimerWait);
-    readNewDallasTemp(mqtt_client, log_message, mqtt_topic_base);
   }
 }
 
