@@ -1,6 +1,6 @@
 name: Build binary
 
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
 
 env:
   ARDUINO_BOARD_MANAGER_ADDITIONAL_URLS: "http://arduino.esp8266.com/stable/package_esp8266com_index.json https://espressif.github.io/arduino-esp32/package_esp32_dev_index.json"
@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Update version.h
         if: github.ref != 'refs/heads/main' #do not change version in main branch run
@@ -19,7 +19,7 @@ jobs:
         shell: bash
 
       - name: Setup Arduino CLI
-        uses: arduino/setup-arduino-cli@v1.1.1
+        uses: arduino/setup-arduino-cli@v1
 
       - name: Install platform
         run:  |
@@ -43,15 +43,24 @@ jobs:
         run: cd HeishaMon && MD5=`md5sum HeishaMon.ino.bin | cut -d\  -f1` && mv HeishaMon.ino.bin HeishaMon_ESP8266-alpha-$MD5.bin
         shell: bash
 
+      - name: Compile debug Sketch for ESP8266
+        run: cd HeishaMon && arduino-cli compile --output-dir . --fqbn=esp8266:esp8266:d1_mini:xtal=160,vt=flash,ssl=basic,mmu=3216,non32xfer=fast,eesz=4M2M,ip=lm2f,dbg=Serial1,lvl=None____,wipe=none,baud=921600 --warnings=none --verbose HeishaMon.ino
+
+      - name: Add MD5 checksum to ESP8266 debug binary
+        run: cd HeishaMon && MD5=`md5sum HeishaMon.ino.bin | cut -d\  -f1` && mv HeishaMon.ino.bin HeishaMon_ESP8266-debug-$MD5.bin && mv HeishaMon.ino.elf HeishaMon_ESP8266-debug.elf
+        shell: bash
+
       - name: Compile Sketch for ESP32
         run: cd HeishaMon && arduino-cli compile --output-dir . --fqbn=esp32:esp32:esp32s3:CDCOnBoot=cdc,PSRAM=enabled,PartitionScheme=min_spiffs  --warnings=none --verbose HeishaMon.ino
 
       - name: Add MD5 checksum to ESP32 binary
         run: cd HeishaMon && MD5=`md5sum HeishaMon.ino.bin | cut -d\  -f1` && mv HeishaMon.ino.bin HeishaMon_ESP32-alpha-$MD5.bin
-        shell: bash        
+        shell: bash
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: HeishaMon.ino.bin
-          path: HeishaMon/HeishaMon_*.bin
+          path: |
+            HeishaMon/HeishaMon_*.bin
+            HeishaMon/HeishaMon_*.elf

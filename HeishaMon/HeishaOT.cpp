@@ -515,237 +515,256 @@ void mqttOTCallback(char* topic, char* value) {
 
 void openthermTableOutput(struct webserver_t *client) {
   char str[64];
-  //chEnable
-  webserver_send_content_P(client, PSTR("<tr><td>chEnable</td><td>W</td><td>"), 35);
-  getOTStructMember(_F("chEnable"))->value.b ? webserver_send_content_P(client, PSTR("enabled"), 7) : webserver_send_content_P(client, PSTR("disabled"), 8);
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);
-  //dhwEnable
-  webserver_send_content_P(client, PSTR("<tr><td>dhwEnable</td><td>W</td><td>"), 36);
-  getOTStructMember(_F("dhwEnable"))->value.b ? webserver_send_content_P(client, PSTR("enabled"), 7) : webserver_send_content_P(client, PSTR("disabled"), 8);
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);  
-  //coolingEnable
-  webserver_send_content_P(client, PSTR("<tr><td>coolingEnable</td><td>W</td><td>"), 40);
-  getOTStructMember(_F("coolingEnable"))->value.b ? webserver_send_content_P(client, PSTR("enabled"), 7) : webserver_send_content_P(client, PSTR("disabled"), 8);
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);  
-  //roomtemp
-  webserver_send_content_P(client, PSTR("<tr><td>roomTemp</td><td>W</td><td>"), 35);
-  dtostrf( getOTStructMember(_F("roomTemp"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);
-  //roomtempset
-  webserver_send_content_P(client, PSTR("<tr><td>roomTempSet</td><td>W</td><td>"), 38);
-  dtostrf( getOTStructMember(_F("roomTempSet"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);
-  //chSetpoint
-  webserver_send_content_P(client, PSTR("<tr><td>chSetpoint</td><td>W</td><td>"), 37);
-  dtostrf( getOTStructMember(_F("chSetpoint"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);
-  //maxRelativeModulation
-  webserver_send_content_P(client, PSTR("<tr><td>maxRelativeModulation</td><td>W</td><td>"), 48);
-  dtostrf( getOTStructMember(_F("maxRelativeModulation"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);  
-  //chSetpoint
-  webserver_send_content_P(client, PSTR("<tr><td>coolingControl</td><td>W</td><td>"), 41);
-  dtostrf( getOTStructMember(_F("coolingControl"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);  
-  //dhwSetpoint
-  webserver_send_content_P(client, PSTR("<tr><td>dhwSetpoint</td><td>RW</td><td>"), 39);
-  dtostrf( getOTStructMember(_F("dhwSetpoint"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);
-  //maxTSet
-  webserver_send_content_P(client, PSTR("<tr><td>maxTSet</td><td>RW</td><td>"), 35);
-  dtostrf( getOTStructMember(_F("maxTSet"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);
-  //chPressure
-  webserver_send_content_P(client, PSTR("<tr><td>chPressure</td><td>R</td><td>"), 37);
-  dtostrf( getOTStructMember(_F("chPressure"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);  
-  //outsideTemp
-  webserver_send_content_P(client, PSTR("<tr><td>outsideTemp</td><td>R</td><td>"), 38);
-  dtostrf( getOTStructMember(_F("outsideTemp"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);
-  //inletTemp
-  webserver_send_content_P(client, PSTR("<tr><td>inletTemp</td><td>R</td><td>"), 36);
-  dtostrf( getOTStructMember(_F("inletTemp"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);
-  //outletTemp
-  webserver_send_content_P(client, PSTR("<tr><td>outletTemp</td><td>R</td><td>"), 37);
-  dtostrf( getOTStructMember(_F("outletTemp"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);
-  //dhwTemp
-  webserver_send_content_P(client, PSTR("<tr><td>dhwTemp</td><td>R</td><td>"), 34);
-  dtostrf( getOTStructMember(_F("dhwTemp"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);
-  //relativeModulation
-  webserver_send_content_P(client, PSTR("<tr><td>relativeModulation</td><td>R</td><td>"), 45);
-  dtostrf( getOTStructMember(_F("relativeModulation"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);
-  //flameState
-  webserver_send_content_P(client, PSTR("<tr><td>flameState</td><td>R</td><td>"), 37);
-  getOTStructMember(_F("flameState"))->value.b ? webserver_send_content_P(client, PSTR("on"), 2) : webserver_send_content_P(client, PSTR("off"), 3);
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);
-  //chState
-  webserver_send_content_P(client, PSTR("<tr><td>chState</td><td>R</td><td>"), 34);
-  getOTStructMember(_F("chState"))->value.b ? webserver_send_content_P(client, PSTR("on"), 2) : webserver_send_content_P(client, PSTR("off"), 3);
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);
-  //dhwState
-  webserver_send_content_P(client, PSTR("<tr><td>dhwState</td><td>R</td><td>"), 35);
-  getOTStructMember(_F("dhwState"))->value.b ? webserver_send_content_P(client, PSTR("on"), 2) : webserver_send_content_P(client, PSTR("off"), 3);
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);
-  //coolingState
-  webserver_send_content_P(client, PSTR("<tr><td>coolingState</td><td>R</td><td>"), 39);
-  getOTStructMember(_F("coolingState"))->value.b ? webserver_send_content_P(client, PSTR("on"), 2) : webserver_send_content_P(client, PSTR("off"), 3);
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);
-  //dhwSetUppBound
-  webserver_send_content_P(client, PSTR("<tr><td>dhwSetUppBound</td><td>R</td><td>"), 41);
-  itoa( getOTStructMember(_F("dhwSetUppBound"))->value.s8, str, 10);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);
-  //dhwSetLowBound
-  webserver_send_content_P(client, PSTR("<tr><td>dhwSetLowBound</td><td>R</td><td>"), 41);
-  itoa( getOTStructMember(_F("dhwSetLowBound"))->value.s8, str, 10);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);
-  //chSetUppBound
-  webserver_send_content_P(client, PSTR("<tr><td>chSetUppBound</td><td>R</td><td>"), 40);
-  itoa( getOTStructMember(_F("chSetUppBound"))->value.s8, str, 10);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);
-  //chSetLowBound
-  webserver_send_content_P(client, PSTR("<tr><td>chSetLowBound</td><td>R</td><td>"), 40);
-  itoa( getOTStructMember(_F("chSetLowBound"))->value.s8, str, 10);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("</td></tr>"), 10);        
+  if(client->content == 1) {
+    //chEnable
+    webserver_send_content_P(client, PSTR("<tr><td>chEnable</td><td>W</td><td>"), 35);
+    getOTStructMember(_F("chEnable"))->value.b ? webserver_send_content_P(client, PSTR("enabled"), 7) : webserver_send_content_P(client, PSTR("disabled"), 8);
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+    //dhwEnable
+    webserver_send_content_P(client, PSTR("<tr><td>dhwEnable</td><td>W</td><td>"), 36);
+    getOTStructMember(_F("dhwEnable"))->value.b ? webserver_send_content_P(client, PSTR("enabled"), 7) : webserver_send_content_P(client, PSTR("disabled"), 8);
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);  
+    //coolingEnable
+    webserver_send_content_P(client, PSTR("<tr><td>coolingEnable</td><td>W</td><td>"), 40);
+    getOTStructMember(_F("coolingEnable"))->value.b ? webserver_send_content_P(client, PSTR("enabled"), 7) : webserver_send_content_P(client, PSTR("disabled"), 8);
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);  
+  } else if (client->content == 2) {
+    //roomtemp
+    webserver_send_content_P(client, PSTR("<tr><td>roomTemp</td><td>W</td><td>"), 35);
+    dtostrf( getOTStructMember(_F("roomTemp"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+    //roomtempset
+    webserver_send_content_P(client, PSTR("<tr><td>roomTempSet</td><td>W</td><td>"), 38);
+    dtostrf( getOTStructMember(_F("roomTempSet"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+    //chSetpoint
+    webserver_send_content_P(client, PSTR("<tr><td>chSetpoint</td><td>W</td><td>"), 37);
+    dtostrf( getOTStructMember(_F("chSetpoint"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+  } else if (client->content == 3) {
+    //maxRelativeModulation
+    webserver_send_content_P(client, PSTR("<tr><td>maxRelativeModulation</td><td>W</td><td>"), 48);
+    dtostrf( getOTStructMember(_F("maxRelativeModulation"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+    //chSetpoint
+    webserver_send_content_P(client, PSTR("<tr><td>coolingControl</td><td>W</td><td>"), 41);
+    dtostrf( getOTStructMember(_F("coolingControl"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+    //dhwSetpoint
+    webserver_send_content_P(client, PSTR("<tr><td>dhwSetpoint</td><td>RW</td><td>"), 39);
+    dtostrf( getOTStructMember(_F("dhwSetpoint"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+  } else if (client->content == 4) {
+    //maxTSet
+    webserver_send_content_P(client, PSTR("<tr><td>maxTSet</td><td>RW</td><td>"), 35);
+    dtostrf( getOTStructMember(_F("maxTSet"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+    //chPressure
+    webserver_send_content_P(client, PSTR("<tr><td>chPressure</td><td>R</td><td>"), 37);
+    dtostrf( getOTStructMember(_F("chPressure"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+    //outsideTemp
+    webserver_send_content_P(client, PSTR("<tr><td>outsideTemp</td><td>R</td><td>"), 38);
+    dtostrf( getOTStructMember(_F("outsideTemp"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+  } else if (client->content == 5) {
+    //inletTemp
+    webserver_send_content_P(client, PSTR("<tr><td>inletTemp</td><td>R</td><td>"), 36);
+    dtostrf( getOTStructMember(_F("inletTemp"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+    //outletTemp
+    webserver_send_content_P(client, PSTR("<tr><td>outletTemp</td><td>R</td><td>"), 37);
+    dtostrf( getOTStructMember(_F("outletTemp"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+    //dhwTemp
+    webserver_send_content_P(client, PSTR("<tr><td>dhwTemp</td><td>R</td><td>"), 34);
+    dtostrf( getOTStructMember(_F("dhwTemp"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+  } else if (client->content == 6) {
+    //relativeModulation
+    webserver_send_content_P(client, PSTR("<tr><td>relativeModulation</td><td>R</td><td>"), 45);
+    dtostrf( getOTStructMember(_F("relativeModulation"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+    //flameState
+    webserver_send_content_P(client, PSTR("<tr><td>flameState</td><td>R</td><td>"), 37);
+    getOTStructMember(_F("flameState"))->value.b ? webserver_send_content_P(client, PSTR("on"), 2) : webserver_send_content_P(client, PSTR("off"), 3);
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+    //chState
+    webserver_send_content_P(client, PSTR("<tr><td>chState</td><td>R</td><td>"), 34);
+    getOTStructMember(_F("chState"))->value.b ? webserver_send_content_P(client, PSTR("on"), 2) : webserver_send_content_P(client, PSTR("off"), 3);
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+  } else if (client->content == 7) {
+    //dhwState
+    webserver_send_content_P(client, PSTR("<tr><td>dhwState</td><td>R</td><td>"), 35);
+    getOTStructMember(_F("dhwState"))->value.b ? webserver_send_content_P(client, PSTR("on"), 2) : webserver_send_content_P(client, PSTR("off"), 3);
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+    //coolingState
+    webserver_send_content_P(client, PSTR("<tr><td>coolingState</td><td>R</td><td>"), 39);
+    getOTStructMember(_F("coolingState"))->value.b ? webserver_send_content_P(client, PSTR("on"), 2) : webserver_send_content_P(client, PSTR("off"), 3);
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+    //dhwSetUppBound
+    webserver_send_content_P(client, PSTR("<tr><td>dhwSetUppBound</td><td>R</td><td>"), 41);
+    itoa( getOTStructMember(_F("dhwSetUppBound"))->value.s8, str, 10);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+  } else if (client->content == 8) {
+    //dhwSetLowBound
+    webserver_send_content_P(client, PSTR("<tr><td>dhwSetLowBound</td><td>R</td><td>"), 41);
+    itoa( getOTStructMember(_F("dhwSetLowBound"))->value.s8, str, 10);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+    //chSetUppBound
+    webserver_send_content_P(client, PSTR("<tr><td>chSetUppBound</td><td>R</td><td>"), 40);
+    itoa( getOTStructMember(_F("chSetUppBound"))->value.s8, str, 10);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+    //chSetLowBound
+    webserver_send_content_P(client, PSTR("<tr><td>chSetLowBound</td><td>R</td><td>"), 40);
+    itoa( getOTStructMember(_F("chSetLowBound"))->value.s8, str, 10);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+  }
 }
 
 void openthermJsonOutput(struct webserver_t *client) {
-  webserver_send_content_P(client, PSTR("{"), 1);
-
   char str[64];
-
-  //chEnable
-  webserver_send_content_P(client, PSTR("\"chEnable\":{\"type\": \"W\",\"value\":"), 32);
-  getOTStructMember(_F("chEnable"))->value.b ? webserver_send_content_P(client, PSTR("true"), 4) : webserver_send_content_P(client, PSTR("false"), 5);
-  webserver_send_content_P(client, PSTR("},"), 2);
-  //dhwEnable
-  webserver_send_content_P(client, PSTR("\"dhwEnable\":{\"type\": \"W\",\"value\":"), 33);
-  getOTStructMember(_F("dhwEnable"))->value.b ? webserver_send_content_P(client, PSTR("true"), 4) : webserver_send_content_P(client, PSTR("false"), 5);
-  webserver_send_content_P(client, PSTR("},"), 2);  
-  //coolingEnable
-  webserver_send_content_P(client, PSTR("\"coolingEnable\":{\"type\": \"W\",\"value\":"), 37);
-  getOTStructMember(_F("coolingEnable"))->value.b ? webserver_send_content_P(client, PSTR("true"), 4) : webserver_send_content_P(client, PSTR("false"), 5);
-  webserver_send_content_P(client, PSTR("},"), 2);  
-  //roomtemp
-  webserver_send_content_P(client, PSTR("\"roomTemp\":{\"type\": \"W\",\"value\":"), 32);
-  dtostrf( getOTStructMember(_F("roomTemp"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("},"), 2);
-  //roomtempset
-  webserver_send_content_P(client, PSTR("\"roomTempSet\":{\"type\": \"W\",\"value\":"), 35);
-  dtostrf( getOTStructMember(_F("roomTempSet"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("},"), 2);
-  //chSetpoint
-  webserver_send_content_P(client, PSTR("\"chSetpoint\":{\"type\": \"W\",\"value\":"), 34);
-  dtostrf( getOTStructMember(_F("chSetpoint"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("},"), 2);
-  //maxRelativeModulation
-  webserver_send_content_P(client, PSTR("\"maxRelativeModulation\":{\"type\": \"W\",\"value\":"), 45);
-  dtostrf( getOTStructMember(_F("maxRelativeModulation"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("},"), 2);  
-  //coolingControl
-  webserver_send_content_P(client, PSTR("\"coolingControl\":{\"type\": \"W\",\"value\":"), 38);
-  dtostrf( getOTStructMember(_F("coolingControl"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("},"), 2);  
-  //dhwSetpoint
-  webserver_send_content_P(client, PSTR("\"dhwSetpoint\":{\"type\": \"RW\",\"value\":"), 36);
-  dtostrf( getOTStructMember(_F("dhwSetpoint"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("},"), 2);
-  //maxTSet
-  webserver_send_content_P(client, PSTR("\"maxTSet\":{\"type\": \"RW\",\"value\":"), 32);
-  dtostrf( getOTStructMember(_F("maxTSet"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("},"), 2);
-  //chPressure
-  webserver_send_content_P(client, PSTR("\"chPressure\":{\"type\": \"W\",\"value\":"), 34);
-  dtostrf( getOTStructMember(_F("chPressure"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("},"), 2);  
-  //outsideTemp
-  webserver_send_content_P(client, PSTR("\"outsideTemp\":{\"type\": \"W\",\"value\":"), 35);
-  dtostrf( getOTStructMember(_F("outsideTemp"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("},"), 2);
-  //inletTemp
-  webserver_send_content_P(client, PSTR("\"inletTemp\":{\"type\": \"R\",\"value\":"), 33);
-  dtostrf( getOTStructMember(_F("inletTemp"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("},"), 2);
-  //outletTemp
-  webserver_send_content_P(client, PSTR("\"outletTemp\":{\"type\": \"R\",\"value\":"), 34);
-  dtostrf( getOTStructMember(_F("outletTemp"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("},"), 2);
-  //dhwTemp
-  webserver_send_content_P(client, PSTR("\"dhwTemp\":{\"type\": \"R\",\"value\":"), 31);
-  dtostrf( getOTStructMember(_F("dhwTemp"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("},"), 2);
-  //relativeModulation
-  webserver_send_content_P(client, PSTR("\"relativeModulation\":{\"type\": \"R\",\"value\":"), 42);
-  dtostrf( getOTStructMember(_F("relativeModulation"))->value.f, 0, 2, str);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("},"), 2);  
-  //flameState
-  webserver_send_content_P(client, PSTR("\"flameState\":{\"type\": \"R\",\"value\":"), 34);
-  getOTStructMember(_F("flameState"))->value.b ? webserver_send_content_P(client, PSTR("true"), 4) : webserver_send_content_P(client, PSTR("false"), 5);
-  webserver_send_content_P(client, PSTR("},"), 2);
-  //chState
-  webserver_send_content_P(client, PSTR("\"chState\":{\"type\": \"R\",\"value\":"), 31);
-  getOTStructMember(_F("chState"))->value.b ? webserver_send_content_P(client, PSTR("true"), 4) : webserver_send_content_P(client, PSTR("false"), 5);
-  webserver_send_content_P(client, PSTR("},"), 2);
-  //dhwState
-  webserver_send_content_P(client, PSTR("\"dhwState\":{\"type\": \"R\",\"value\":"), 32);
-  getOTStructMember(_F("dhwState"))->value.b ? webserver_send_content_P(client, PSTR("true"), 4) : webserver_send_content_P(client, PSTR("false"), 5);
-  webserver_send_content_P(client, PSTR("},"), 2);
-  //coolingState
-  webserver_send_content_P(client, PSTR("\"coolingState\":{\"type\": \"R\",\"value\":"), 36);
-  getOTStructMember(_F("coolingState"))->value.b ? webserver_send_content_P(client, PSTR("true"), 4) : webserver_send_content_P(client, PSTR("false"), 5);
-  webserver_send_content_P(client, PSTR("},"), 2);  
-  //dhwSetUppBound
-  webserver_send_content_P(client, PSTR("\"dhwSetUppBound\":{\"type\": \"R\",\"value\":"), 38);
-  itoa( getOTStructMember(_F("dhwSetUppBound"))->value.f, str, 10);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("},"), 2);
-  //dhwSetLowBound
-  webserver_send_content_P(client, PSTR("\"dhwSetLowBound\":{\"type\": \"R\",\"value\":"), 38);
-  itoa( getOTStructMember(_F("dhwSetLowBound"))->value.f, str, 10);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("},"), 2);
-  //chSetUppBound
-  webserver_send_content_P(client, PSTR("\"chSetUppBound\":{\"type\": \"R\",\"value\":"), 37);
-  itoa( getOTStructMember(_F("chSetUppBound"))->value.f, str, 10);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("},"), 2);
-  //chSetLowBound
-  webserver_send_content_P(client, PSTR("\"chSetLowBound\":{\"type\": \"R\",\"value\":"), 37);
-  itoa( getOTStructMember(_F("chSetLowBound"))->value.f, str, 10);
-  webserver_send_content(client, str, strlen(str));
-  webserver_send_content_P(client, PSTR("}}"), 2);       //this is the last line in JSON, keep this at the end 
+  if (client->content == 4000) {
+    webserver_send_content_P(client, PSTR(",\"opentherm\":"), 13);
+    webserver_send_content_P(client, PSTR("{"), 1);
+  } else if (client->content == 4001) {
+    //chEnable
+    webserver_send_content_P(client, PSTR("\"chEnable\":{\"type\": \"W\",\"value\":"), 32);
+    getOTStructMember(_F("chEnable"))->value.b ? webserver_send_content_P(client, PSTR("true"), 4) : webserver_send_content_P(client, PSTR("false"), 5);
+    webserver_send_content_P(client, PSTR("},"), 2);
+    //dhwEnable
+    webserver_send_content_P(client, PSTR("\"dhwEnable\":{\"type\": \"W\",\"value\":"), 33);
+    getOTStructMember(_F("dhwEnable"))->value.b ? webserver_send_content_P(client, PSTR("true"), 4) : webserver_send_content_P(client, PSTR("false"), 5);
+    webserver_send_content_P(client, PSTR("},"), 2);
+    //coolingEnable
+    webserver_send_content_P(client, PSTR("\"coolingEnable\":{\"type\": \"W\",\"value\":"), 37);
+    getOTStructMember(_F("coolingEnable"))->value.b ? webserver_send_content_P(client, PSTR("true"), 4) : webserver_send_content_P(client, PSTR("false"), 5);
+    webserver_send_content_P(client, PSTR("},"), 2);
+  } else if (client->content == 4002) {
+    //roomtemp
+    webserver_send_content_P(client, PSTR("\"roomTemp\":{\"type\": \"W\",\"value\":"), 32);
+    dtostrf( getOTStructMember(_F("roomTemp"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("},"), 2);
+    //roomtempset
+    webserver_send_content_P(client, PSTR("\"roomTempSet\":{\"type\": \"W\",\"value\":"), 35);
+    dtostrf( getOTStructMember(_F("roomTempSet"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("},"), 2);
+    //chSetpoint
+    webserver_send_content_P(client, PSTR("\"chSetpoint\":{\"type\": \"W\",\"value\":"), 34);
+    dtostrf( getOTStructMember(_F("chSetpoint"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("},"), 2);
+  } else if (client->content == 4003) {
+    //maxRelativeModulation
+    webserver_send_content_P(client, PSTR("\"maxRelativeModulation\":{\"type\": \"W\",\"value\":"), 45);
+    dtostrf( getOTStructMember(_F("maxRelativeModulation"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("},"), 2);
+    //coolingControl
+    webserver_send_content_P(client, PSTR("\"coolingControl\":{\"type\": \"W\",\"value\":"), 38);
+    dtostrf( getOTStructMember(_F("coolingControl"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("},"), 2);
+    //dhwSetpoint
+    webserver_send_content_P(client, PSTR("\"dhwSetpoint\":{\"type\": \"RW\",\"value\":"), 36);
+    dtostrf( getOTStructMember(_F("dhwSetpoint"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("},"), 2);
+  } else if (client->content == 4004) {
+    //maxTSet
+    webserver_send_content_P(client, PSTR("\"maxTSet\":{\"type\": \"RW\",\"value\":"), 32);
+    dtostrf( getOTStructMember(_F("maxTSet"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("},"), 2);
+    //chPressure
+    webserver_send_content_P(client, PSTR("\"chPressure\":{\"type\": \"W\",\"value\":"), 34);
+    dtostrf( getOTStructMember(_F("chPressure"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("},"), 2);
+    //outsideTemp
+    webserver_send_content_P(client, PSTR("\"outsideTemp\":{\"type\": \"W\",\"value\":"), 35);
+    dtostrf( getOTStructMember(_F("outsideTemp"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("},"), 2);
+  } else if (client->content == 4005) {
+    //inletTemp
+    webserver_send_content_P(client, PSTR("\"inletTemp\":{\"type\": \"R\",\"value\":"), 33);
+    dtostrf( getOTStructMember(_F("inletTemp"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("},"), 2);
+    //outletTemp
+    webserver_send_content_P(client, PSTR("\"outletTemp\":{\"type\": \"R\",\"value\":"), 34);
+    dtostrf( getOTStructMember(_F("outletTemp"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("},"), 2);
+    //dhwTemp
+    webserver_send_content_P(client, PSTR("\"dhwTemp\":{\"type\": \"R\",\"value\":"), 31);
+    dtostrf( getOTStructMember(_F("dhwTemp"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("},"), 2);
+  } else if (client->content == 4006) {
+    //relativeModulation
+    webserver_send_content_P(client, PSTR("\"relativeModulation\":{\"type\": \"R\",\"value\":"), 42);
+    dtostrf( getOTStructMember(_F("relativeModulation"))->value.f, 0, 2, str);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("},"), 2);
+    //flameState
+    webserver_send_content_P(client, PSTR("\"flameState\":{\"type\": \"R\",\"value\":"), 34);
+    getOTStructMember(_F("flameState"))->value.b ? webserver_send_content_P(client, PSTR("true"), 4) : webserver_send_content_P(client, PSTR("false"), 5);
+    webserver_send_content_P(client, PSTR("},"), 2);
+    //chState
+    webserver_send_content_P(client, PSTR("\"chState\":{\"type\": \"R\",\"value\":"), 31);
+    getOTStructMember(_F("chState"))->value.b ? webserver_send_content_P(client, PSTR("true"), 4) : webserver_send_content_P(client, PSTR("false"), 5);
+    webserver_send_content_P(client, PSTR("},"), 2);
+  } else if (client->content == 4007) {
+    //dhwState
+    webserver_send_content_P(client, PSTR("\"dhwState\":{\"type\": \"R\",\"value\":"), 32);
+    getOTStructMember(_F("dhwState"))->value.b ? webserver_send_content_P(client, PSTR("true"), 4) : webserver_send_content_P(client, PSTR("false"), 5);
+    webserver_send_content_P(client, PSTR("},"), 2);
+    //coolingState
+    webserver_send_content_P(client, PSTR("\"coolingState\":{\"type\": \"R\",\"value\":"), 36);
+    getOTStructMember(_F("coolingState"))->value.b ? webserver_send_content_P(client, PSTR("true"), 4) : webserver_send_content_P(client, PSTR("false"), 5);
+    webserver_send_content_P(client, PSTR("},"), 2);
+    //dhwSetUppBound
+    webserver_send_content_P(client, PSTR("\"dhwSetUppBound\":{\"type\": \"R\",\"value\":"), 38);
+    itoa( getOTStructMember(_F("dhwSetUppBound"))->value.f, str, 10);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("},"), 2);
+  } else if (client->content == 4008) {
+    //dhwSetLowBound
+    webserver_send_content_P(client, PSTR("\"dhwSetLowBound\":{\"type\": \"R\",\"value\":"), 38);
+    itoa( getOTStructMember(_F("dhwSetLowBound"))->value.f, str, 10);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("},"), 2);
+    //chSetUppBound
+    webserver_send_content_P(client, PSTR("\"chSetUppBound\":{\"type\": \"R\",\"value\":"), 37);
+    itoa( getOTStructMember(_F("chSetUppBound"))->value.f, str, 10);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("},"), 2);
+    //chSetLowBound
+    webserver_send_content_P(client, PSTR("\"chSetLowBound\":{\"type\": \"R\",\"value\":"), 37);
+    itoa( getOTStructMember(_F("chSetLowBound"))->value.f, str, 10);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("}}"), 2);       //this is the last line in JSON, keep this at the end
+    client->content = 4998;
+  }
 }

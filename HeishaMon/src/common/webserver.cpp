@@ -36,6 +36,10 @@
   #include <WiFiClient.h>
   #include <WiFiServer.h>
 
+  #ifdef LWIP_SO_RCVBUF
+    #undef LWIP_SO_RCVBUF
+  #endif
+
   #define LWIP_SO_RCVBUF 1
 
   #include "strncasestr.h"
@@ -1773,9 +1777,9 @@ static void webserver_client_close(struct webserver_t *client) {
   }
 #if defined(ESP8266) || defined(ESP32)
   loggingSerial.print(F("Closing webserver client: "));
-  loggingSerial.print(client->client->remoteIP().toString().c_str());
+  loggingSerial.print(client->ip);
   loggingSerial.print(F(":"));
-  loggingSerial.println(client->pcb->remote_port);
+  loggingSerial.println(client->port);
   if(client->callback != NULL) {
     client->callback(client, NULL);
   }
@@ -2051,6 +2055,17 @@ uint8_t webserver_sync_receive(struct webserver_t *client, uint8_t *rbuffer, uin
   return 0;
 }
 
+void webserver_async_err(void *arg, err_t err) {
+  struct webserver_client_t *client = (struct webserver_client_t *)arg;
+#if defined(ESP8266) || defined(ESP32)
+  loggingSerial.print(F("Closing webserver client: "));
+  loggingSerial.print(client->data.ip);
+  loggingSerial.print(F(":"));
+  loggingSerial.println(client->data.port);
+#endif
+  webserver_reset_client(&client->data);
+}
+
 err_t webserver_async_receive(void *arg, tcp_pcb *pcb, struct pbuf *data, err_t err) {
   uint16_t size = 0;
   uint8_t i = 0;
@@ -2073,6 +2088,8 @@ err_t webserver_async_receive(void *arg, tcp_pcb *pcb, struct pbuf *data, err_t 
     for(i=0;i<WEBSERVER_MAX_CLIENTS;i++) {
       if(clients[i].data.pcb == pcb) {
         struct webserver_t *client = &clients[i].data;
+
+        clients[i].data.lastseen = millis();
 
         if(webserver_sync_receive(client, rbuffer, size) == 1) {
           continue;
@@ -2118,7 +2135,7 @@ err_t webserver_poll(void *arg, struct tcp_pcb *pcb) {
       }
       if((unsigned long)(millis() - clients[i].data.lastseen) > WEBSERVER_CLIENT_TIMEOUT) {
   #if defined(ESP8266) || defined(ESP32)
-        loggingSerial.printf("Timeout webserver client: %s:%d", clients[i].data.client->remoteIP().toString().c_str(), clients[i].data.client->remotePort());
+        loggingSerial.printf(PSTR("Timeout webserver client: %s:%d"), clients[i].data.ip, clients[i].data.port);
   #endif
         clients[i].data.step = WEBSERVER_CLIENT_CLOSE;
         webserver_client_close(&clients[i].data);
@@ -2156,8 +2173,11 @@ void webserver_reset_client(struct webserver_t *client) {
   client->lastseen = 0;
   client->lastping = 0;
   client->content = 0;
+  client->port = 0;
   client->is_websocket = 0;
   client->userdata = NULL;
+
+  memset(client->ip, 0, 17);
 
   struct sendlist_t *tmp = NULL;
 #if WEBSERVER_MAX_SENDLIST == 0
@@ -2208,14 +2228,19 @@ err_t webserver_client(void *arg, tcp_pcb *pcb, err_t err) {
       clients[i].data.async = 1;
       clients[i].data.step = WEBSERVER_CLIENT_READ_HEADER;
 
+      strncpy((char *)&clients[i].data.ip, clients[i].data.client->remoteIP().toString().c_str(), 17);
+      clients[i].data.port = clients[i].data.pcb->remote_port;
+
       loggingSerial.print(F("New webserver client: "));
-      loggingSerial.print(clients[i].data.client->remoteIP().toString().c_str());
+      loggingSerial.print(clients[i].data.ip);
       loggingSerial.print(F(":"));
-      loggingSerial.println(clients[i].data.pcb->remote_port);
+      loggingSerial.println(clients[i].data.port);
 
       //tcp_nagle_disable(pcb);
       tcp_recv(pcb, &webserver_async_receive);
       tcp_sent(pcb, &webserver_sent);
+      tcp_err(pcb, &webserver_async_err);
+      tcp_arg(pcb, (void *)&clients[i]);
       tcp_poll(pcb, &webserver_poll, 1);
       break;
     }
@@ -2234,7 +2259,7 @@ void webserver_loop(void) {
     }
 
     if(clients[i].data.is_websocket == 1) {
-      if((unsigned long)(millis() - clients[i].data.lastping) > WEBSERVER_CLIENT_PING_INTERVAL) {
+      if(clients[i].data.async == 0 && (unsigned long)(millis() - clients[i].data.lastseen) > WEBSERVER_CLIENT_TIMEOUT) {
         websocket_send_header(&clients[i].data, WEBSOCKET_OPCODE_PING, 0);
         clients[i].data.lastping = millis();
       }
@@ -2242,9 +2267,9 @@ void webserver_loop(void) {
     if((unsigned long)(millis() - clients[i].data.lastseen) > WEBSERVER_CLIENT_TIMEOUT) {
 #if defined(ESP8266) || defined(ESP32)
         loggingSerial.print("Timeout webserver client: ");
-        loggingSerial.print(clients[i].data.client->remoteIP());
+        loggingSerial.print(clients[i].data.ip);
         loggingSerial.print(":");
-        loggingSerial.println(clients[i].data.client->remotePort());
+        loggingSerial.println(clients[i].data.port);
 #endif
       clients[i].data.step = WEBSERVER_CLIENT_CLOSE;
     }
@@ -2309,9 +2334,9 @@ void webserver_loop(void) {
       case WEBSERVER_CLIENT_CLOSE: {
 #if defined(ESP8266) || defined(ESP32)
         loggingSerial.print("Closing webserver client: ");
-        loggingSerial.print(clients[i].data.client->remoteIP());
+        loggingSerial.print(clients[i].data.ip);
         loggingSerial.print(":");
-        loggingSerial.println(clients[i].data.client->remotePort());
+        loggingSerial.println(clients[i].data.port);
 #endif
         if(clients[i].data.callback != NULL) {
           clients[i].data.callback(&clients[i].data, NULL);
@@ -2338,10 +2363,13 @@ void webserver_loop(void) {
           clients[i].data.client->setNoDelay(true);
           clients[i].data.client->setTimeout(5000);
 
+          strncpy((char *)&clients[i].data.ip, clients[i].data.client->remoteIP().toString().c_str(), 17);
+          clients[i].data.port = clients[i].data.client->remotePort();
+
           loggingSerial.print("New webserver client: ");
-          loggingSerial.print(clients[i].data.client->remoteIP());
+          loggingSerial.print(clients[i].data.ip);
           loggingSerial.print(":");
-          loggingSerial.println(clients[i].data.client->remotePort());
+          loggingSerial.println(clients[i].data.port);
           break;
         }
       }
@@ -2366,7 +2394,7 @@ int8_t webserver_start(int port, webserver_cb_t *callback, uint8_t async) {
       return -1;
     }
 
-    tcp_setprio(async_server, TCP_PRIO_MIN);
+    tcp_setprio(async_server, TCP_PRIO_MAX);
 
     ip_addr_t local_addr;
 #ifdef ESP8266
@@ -2389,7 +2417,7 @@ int8_t webserver_start(int port, webserver_cb_t *callback, uint8_t async) {
     }
     async_server = listen_pcb;
     tcp_nagle_disable(async_server);
-    tcp_setprio(async_server, TCP_PRIO_MIN);
+    tcp_setprio(async_server, TCP_PRIO_MAX);
     tcp_accept(async_server, &webserver_client);
     tcp_arg(async_server, (void *)callback);
 #endif

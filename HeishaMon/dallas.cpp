@@ -121,28 +121,31 @@ void dallasLoop(PubSubClient &mqtt_client, void (*log_message)(char*), char* mqt
 }
 
 void dallasJsonOutput(struct webserver_t *client) {
-  webserver_send_content_P(client, PSTR("["), 1);
-
-  for (int i = 0; i < dallasDevicecount; i++) {
+  int i = client->content-2001;
+  if (client->content == 2000) {
+    webserver_send_content_P(client, PSTR(",\"1wire\":"), 9);
+    webserver_send_content_P(client, PSTR("["), 1);
+  } else if (i < dallasDevicecount) {
     webserver_send_content_P(client, PSTR("{\"Sensor\":\""), 11);
     webserver_send_content(client, actDallasData[i].address, strlen(actDallasData[i].address));
-    webserver_send_content_P(client, PSTR("\",\"Temperature\":"), 16);
+    webserver_send_content_P(client, PSTR("\",\"Temperature\":\""), 17);
     char str[64];
     dtostrf(actDallasData[i].temperature, 0, 2, str);
     webserver_send_content(client, str, strlen(str));
-    webserver_send_content_P(client, PSTR(",\"Alias\":\""), 10);
-    webserver_send_content(client, actDallasData[i].alias, strlen(actDallasData[i].alias));
     if (i < dallasDevicecount - 1) {
       webserver_send_content_P(client, PSTR("\"},"), 3);
     } else {
       webserver_send_content_P(client, PSTR("\"}"), 2);
     }
+  } else {
+    webserver_send_content_P(client, PSTR("]"), 1);
+    client->content = 2998;
   }
-  webserver_send_content_P(client, PSTR("]"), 1);
 }
 
 void dallasTableOutput(struct webserver_t *client) {
-  for (int i = 0; i < dallasDevicecount; i++) {
+  int i = client->content-1;
+  if (i < dallasDevicecount) {
     webserver_send_content_P(client, PSTR("<tr><td>"), 8);
     webserver_send_content(client, actDallasData[i].address, strlen(actDallasData[i].address));
     webserver_send_content_P(client, PSTR("</td><td>"), 9);

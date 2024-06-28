@@ -184,87 +184,99 @@ void s0Loop(PubSubClient &mqtt_client, void (*log_message)(char*), char* mqtt_to
 unsigned long tablePulses[NUM_S0_COUNTERS];
 
 void s0TableOutput(struct webserver_t *client) {
-  for (int i = 0; i < NUM_S0_COUNTERS; i++) {
-    webserver_send_content_P(client, PSTR("<tr><td>"), 8);
-
+  int i = (client->content-1)/2;
+  if (i < NUM_S0_COUNTERS) {
     char str[12];
-    itoa(i + 1, str, 10);
-    webserver_send_content(client, str, strlen(str));
+    if (((client->content-1)%2) == 0) {
+      webserver_send_content_P(client, PSTR("<tr><td>"), 8);
 
-    webserver_send_content_P(client, PSTR("</td><td>"), 9);
+      itoa(i + 1, str, 10);
+      webserver_send_content(client, str, strlen(str));
 
-    itoa(actS0Data[i].watt, str, 10);
-    webserver_send_content(client, str, strlen(str));
+      webserver_send_content_P(client, PSTR("</td><td>"), 9);
 
-    webserver_send_content_P(client, PSTR("</td><td>"), 9);
+      itoa(actS0Data[i].watt, str, 10);
+      webserver_send_content(client, str, strlen(str));
 
-    itoa(((actS0Data[i].pulsesTotal - tablePulses[i]) * ( 1000.0 / actS0Settings[i].ppkwh)), str, 10);
-    webserver_send_content(client, str, strlen(str));
+      webserver_send_content_P(client, PSTR("</td><td>"), 9);
 
-    tablePulses[i] = actS0Data[i].pulsesTotal;
+      itoa(((actS0Data[i].pulsesTotal - tablePulses[i]) * ( 1000.0 / actS0Settings[i].ppkwh)), str, 10);
+      webserver_send_content(client, str, strlen(str));
 
-    webserver_send_content_P(client, PSTR("</td><td>"), 9);
+      tablePulses[i] = actS0Data[i].pulsesTotal;
 
-    itoa((actS0Data[i].pulsesTotal * (1000.0 / actS0Settings[i].ppkwh)), str, 10);
-    webserver_send_content(client, str, strlen(str));
+      webserver_send_content_P(client, PSTR("</td><td>"), 9);
+    }
+    if (((client->content-1)%2) == 1) {
+      itoa((actS0Data[i].pulsesTotal * (1000.0 / actS0Settings[i].ppkwh)), str, 10);
+      webserver_send_content(client, str, strlen(str));
 
-    webserver_send_content_P(client, PSTR("</td><td>"), 9);
+      webserver_send_content_P(client, PSTR("</td><td>"), 9);
 
-    itoa((100 * (actS0Data[i].goodPulses + 1) / (actS0Data[i].goodPulses + actS0Data[i].badPulses + 1)), str, 10);
-    webserver_send_content(client, str, strlen(str));
+      itoa((100 * (actS0Data[i].goodPulses + 1) / (actS0Data[i].goodPulses + actS0Data[i].badPulses + 1)), str, 10);
+      webserver_send_content(client, str, strlen(str));
 
-    webserver_send_content_P(client, PSTR("%</td><td>"), 10);
+      webserver_send_content_P(client, PSTR("%</td><td>"), 10);
 
-    itoa(actS0Data[i].avgPulseWidth, str, 10);
-    webserver_send_content(client, str, strlen(str));
+      itoa(actS0Data[i].avgPulseWidth, str, 10);
+      webserver_send_content(client, str, strlen(str));
 
-    webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+      webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+    }
   }
 }
 
 unsigned long jsonPulses[NUM_S0_COUNTERS];
 
 void s0JsonOutput(struct webserver_t *client) {
-  webserver_send_content_P(client, PSTR("["), 1);
-  for (int i = 0; i < NUM_S0_COUNTERS; i++) {
-    webserver_send_content_P(client, PSTR("{\"S0 port\":"), 11);
-
+  int i = (client->content-3001)/2;
+  if (client->content == 3000) {
+    webserver_send_content_P(client, PSTR(",\"s0\":"), 6);
+    webserver_send_content_P(client, PSTR("["), 1);
+  } else if (i < NUM_S0_COUNTERS) {
     char str[12];
-    itoa(i + 1, str, 10);
-    webserver_send_content(client, str, strlen(str));
+    if (((client->content-3001)%2) == 0) {
+      webserver_send_content_P(client, PSTR("{\"S0 port\":"), 11);
+      itoa(i + 1, str, 10);
+      webserver_send_content(client, str, strlen(str));
 
-    webserver_send_content_P(client, PSTR(",\"Watt\":"), 8);
+      webserver_send_content_P(client, PSTR(",\"Watt\":"), 8);
 
-    itoa(actS0Data[i].watt, str, 10);
-    webserver_send_content(client, str, strlen(str));
+      itoa(actS0Data[i].watt, str, 10);
+      webserver_send_content(client, str, strlen(str));
 
-    webserver_send_content_P(client, PSTR(",\"Watthour\":"), 12);
+      webserver_send_content_P(client, PSTR(",\"Watthour\":"), 12);
 
-    itoa(((actS0Data[i].pulsesTotal - tablePulses[i]) * (1000.0 / actS0Settings[i].ppkwh)), str, 10);
-    webserver_send_content(client, str, strlen(str));
+      itoa(((actS0Data[i].pulsesTotal - tablePulses[i]) * (1000.0 / actS0Settings[i].ppkwh)), str, 10);
+      webserver_send_content(client, str, strlen(str));
 
-    jsonPulses[i] = actS0Data[i].pulsesTotal;
+      jsonPulses[i] = actS0Data[i].pulsesTotal;
 
-    webserver_send_content_P(client, PSTR(",\"WatthourTotal\":"), 17);
-
-    itoa((actS0Data[i].pulsesTotal * (1000.0 / actS0Settings[i].ppkwh)), str, 10);
-    webserver_send_content(client, str, strlen(str));
-
-    webserver_send_content_P(client, PSTR(",\"PulseQuality\":"), 16);
-
-    itoa((100 * (actS0Data[i].goodPulses + 1) / (actS0Data[i].goodPulses + actS0Data[i].badPulses + 1)), str, 10);
-    webserver_send_content(client, str, strlen(str));
-
-    webserver_send_content_P(client, PSTR(",\"AvgPulseWidth\":"), 17);
-
-    itoa(actS0Data[i].avgPulseWidth, str, 10);
-    webserver_send_content(client, str, strlen(str));
-
-    if (i < NUM_S0_COUNTERS - 1) {
-      webserver_send_content_P(client, PSTR("},"), 2);
-    } else {
-      webserver_send_content_P(client, PSTR("}"), 1);
+      webserver_send_content_P(client, PSTR(",\"WatthourTotal\":"), 17);
     }
+
+    if (((client->content-3001)%2) == 1) {
+      itoa((actS0Data[i].pulsesTotal * (1000.0 / actS0Settings[i].ppkwh)), str, 10);
+      webserver_send_content(client, str, strlen(str));
+
+      webserver_send_content_P(client, PSTR(",\"PulseQuality\":"), 16);
+
+      itoa((100 * (actS0Data[i].goodPulses + 1) / (actS0Data[i].goodPulses + actS0Data[i].badPulses + 1)), str, 10);
+      webserver_send_content(client, str, strlen(str));
+
+      webserver_send_content_P(client, PSTR(",\"AvgPulseWidth\":"), 17);
+
+      itoa(actS0Data[i].avgPulseWidth, str, 10);
+      webserver_send_content(client, str, strlen(str));
+
+      if (i < NUM_S0_COUNTERS - 1) {
+        webserver_send_content_P(client, PSTR("},"), 2);
+      } else {
+        webserver_send_content_P(client, PSTR("}"), 1);
+      }
+    }
+  } else {
+    webserver_send_content_P(client, PSTR("]"), 1);
+    client->content = 3998;
   }
-  webserver_send_content_P(client, PSTR("]"), 1);
 }

@@ -712,40 +712,54 @@ static void rules_print_stack(struct varstack_t *table) {
   if(table == NULL) {
     return;
   } else {
-    uint16_t x = 0;
+    char *out = NULL;
+    uint16_t x = 0, l = 0;
     for(x=0;x<table->nr;x++) {
       array = &table->array[x];
       switch(array->type) {
         case VINTEGER: {
-#ifdef ESP8266
-          logprintf_P(F("%2d %s = %d"), x, array->key, array->val.i);
-#else
-          printf("%2d %s = %d\n", x, array->key, array->val.i);
-#endif
+          l += snprintf_P(NULL, 0, PSTR("%2d %s = %d\n"), x, array->key, array->val.i);
         } break;
         case VFLOAT: {
-#ifdef ESP8266
-          logprintf_P(F("%2d %s = %g"), x, array->key, array->val.f);
-#else
-          printf("%2d %s = %g\n", x, array->key, array->val.f);
-#endif
+          l += snprintf_P(NULL, 0, PSTR("%2d %s = %g\n"), x, array->key, array->val.f);
         } break;
         case VCHAR: {
-#ifdef ESP8266
-          logprintf_P(F("%2d %s = %s"), x, array->key, array->val.s);
-#else
-          printf("%2d %s = %s\n", x, array->key, array->val.s);
-#endif
+          l += snprintf_P(NULL, 0, PSTR("%2d %s = %s\n"), x, array->key, array->val.s);
         } break;
         case VNULL: {
-#ifdef ESP8266
-          logprintf_P(F("%d %s = NULL"), x, array->key);
-#else
-          printf("%2d %s = NULL\n", x, array->key);
-#endif
+          l += snprintf_P(NULL, 0, PSTR("%d %s = NULL\n"), x, array->key);
         } break;
       }
     }
+    if((out = (char *)malloc(l+1)) == NULL) {
+      logprintf_P(F("Not enough memory for rules console output %s:#%d"), __FUNCTION__, __LINE__);
+      return;
+    }
+    memset(out, 0, l+1);
+    l = 0;
+    for(x=0;x<table->nr;x++) {
+      array = &table->array[x];
+      switch(array->type) {
+        case VINTEGER: {
+          l += sprintf_P(&out[l], PSTR("%2d %s = %d\n"), x, array->key, array->val.i);
+        } break;
+        case VFLOAT: {
+          l += sprintf_P(&out[l], PSTR("%2d %s = %g\n"), x, array->key, array->val.f);
+        } break;
+        case VCHAR: {
+          l += sprintf_P(&out[l], PSTR("%2d %s = %s\n"), x, array->key, array->val.s);
+        } break;
+        case VNULL: {
+          l += sprintf_P(&out[l], PSTR("%d %s = NULL\n"), x, array->key);
+        } break;
+      }
+    }
+#ifdef ESP8266
+    logprintf_P(F("%s\n"), out);
+#else
+    printf("%s\n", out);
+#endif
+    free(out);
   }
 }
 
@@ -774,7 +788,6 @@ void rules_timer_cb(int nr) {
 
     if(ret == 0) {
       logprintf_P(F("%s%d %s %d %s"), F("rule #"), rules[nr]->nr, F("was executed in"), timestamp.second - timestamp.first, F("microseconds"));
-
       logprintf_P(F("\n>>> local variables\n"));
       rules_print_stack((struct varstack_t *)rules[nr]->userdata);
       logprintf_P(F("\n>>> global variables\n"));
@@ -976,9 +989,8 @@ void rules_deinitialize() {
         }
       }
       rules_gc(&rules, &nrrules);
-	  rules_free_stack();
+      rules_free_stack();
     }
-
 
     // set this to NULL so a new initialize can start if necessary. 
     rule_options.event_cb = NULL;

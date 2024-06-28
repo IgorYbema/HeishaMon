@@ -841,6 +841,7 @@ int getSettings(struct webserver_t *client, settingsStruct *heishamonSettings) {
         webserver_send_content(client, str, strlen(str));
       } break;
     case 11: {
+        int i = 0;
         char str[20];
         webserver_send_content_P(client, PSTR(",\"use_s0\":"), 10);
 
@@ -848,8 +849,6 @@ int getSettings(struct webserver_t *client, settingsStruct *heishamonSettings) {
         webserver_send_content(client, str, strlen(str));
 
         webserver_send_content_P(client, PSTR(",\"s0_1_gpio\":"), 13);
-
-        int i = 0;
 
         if (heishamonSettings->s0Settings[i].gpiopin == 255) heishamonSettings->s0Settings[i].gpiopin = DEFAULT_S0_PIN_1;  //dirty hack
         itoa(heishamonSettings->s0Settings[i].gpiopin, str, 10);
@@ -869,6 +868,10 @@ int getSettings(struct webserver_t *client, settingsStruct *heishamonSettings) {
 
         itoa(heishamonSettings->s0Settings[i].minimalPulseWidth, str, 10);
         webserver_send_content(client, str, strlen(str));
+      } break;
+    case 12: {
+        int i = 0;
+        char str[20];
 
         webserver_send_content_P(client, PSTR(",\"s0_1_maxpulsewidth\":"), 22);
 
@@ -881,10 +884,8 @@ int getSettings(struct webserver_t *client, settingsStruct *heishamonSettings) {
         webserver_send_content(client, str, strlen(str));
 
         webserver_send_content_P(client, PSTR(",\"s0_2_gpio\":"), 13);
-      } break;
-    case 12: {
-        char str[20];
-        int i = 1;
+
+        i = 1;
 
         if (heishamonSettings->s0Settings[i].gpiopin == 255) heishamonSettings->s0Settings[i].gpiopin = DEFAULT_S0_PIN_2;  //dirty hack
         itoa(heishamonSettings->s0Settings[i].gpiopin, str, 10);
@@ -899,6 +900,10 @@ int getSettings(struct webserver_t *client, settingsStruct *heishamonSettings) {
 
         itoa(heishamonSettings->s0Settings[i].lowerPowerInterval, str, 10);
         webserver_send_content(client, str, strlen(str));
+      } break;
+    case 13: {
+        int i = 1;
+        char str[20];
 
         webserver_send_content_P(client, PSTR(",\"s0_2_minpulsewidth\":"), 22);
 
@@ -1102,144 +1107,43 @@ int handleTableRefresh(struct webserver_t *client, char* actData, char* actDataE
   if (client->route == 11) {
     if (client->content == 0) {
       webserver_send(client, 200, (char *)"text/html", 0);
+    } else {
       dallasTableOutput(client);
     }
   } else if (client->route == 12) {
     if (client->content == 0) {
       webserver_send(client, 200, (char *)"text/html", 0);
+    } else {
       s0TableOutput(client);
     }
   } else if (client->route == 13) {
     if (client->content == 0) {
       webserver_send(client, 200, (char *)"text/html", 0);
+    } else {
       openthermTableOutput(client);
     }
   } else if (client->route == 10) {
     if (client->content == 0) {
       webserver_send(client, 200, (char *)"text/html", 0);
-    }
-    if (client->content < NUMBER_OF_TOPICS) {
-      for (uint8_t topic = client->content; topic < NUMBER_OF_TOPICS && topic < client->content + 4; topic++) {
+    } else if (client->content-1 < NUMBER_OF_TOPICS) {
+      uint8_t topic = client->content-1;
+      webserver_send_content_P(client, PSTR("<tr><td>TOP"), 11);
 
-        webserver_send_content_P(client, PSTR("<tr><td>TOP"), 11);
+      char str[12];
+      itoa(topic, str, 10);
+      webserver_send_content(client, str, strlen(str));
 
-        char str[12];
-        itoa(topic, str, 10);
-        webserver_send_content(client, str, strlen(str));
-
-        webserver_send_content_P(client, PSTR("</td><td>"), 9);
-        webserver_send_content_P(client, topics[topic], strlen_P(topics[topic]));
-        webserver_send_content_P(client, PSTR("</td><td>"), 9);
-
-        {
-          String dataValue = actData[0] == '\0' ? "" : getDataValue(actData, topic);
-          char* str = (char *)dataValue.c_str();
-          webserver_send_content(client, str, strlen(str));
-        }
-
-        webserver_send_content_P(client, PSTR("</td><td>"), 9);
-
-        int maxvalue = atoi(topicDescription[topic][0]);
-        int value = actData[0] == '\0' ? 0 : getDataValue(actData, topic).toInt();
-        if (maxvalue == 0) { //this takes the special case where the description is a real value description instead of a mode, so value should take first index (= 0 + 1)
-          value = 0;
-        }
-        if ((value < 0) || (value > maxvalue)) {
-          webserver_send_content_P(client, _unknown, strlen_P(_unknown));
-        }
-        else {
-          webserver_send_content_P(client, topicDescription[topic][value + 1], strlen_P(topicDescription[topic][value + 1]));
-
-        }
-
-        webserver_send_content_P(client, PSTR("</td></tr>"), 10);
-        client->content++;
-      }
-      client->content--; // The webserver also increases by 1
-    } else if (client->content - NUMBER_OF_TOPICS < extraTopics ) {
-      for (uint8_t topic = client->content  - NUMBER_OF_TOPICS ; topic < extraTopics && topic < (client->content - NUMBER_OF_TOPICS + 4 ); topic++) {
-
-        webserver_send_content_P(client, PSTR("<tr><td>XTOP"), 12);
-
-        char str[12];
-        itoa(topic, str, 10);
-        webserver_send_content(client, str, strlen(str));
-
-        webserver_send_content_P(client, PSTR("</td><td>"), 9);
-        webserver_send_content_P(client, xtopics[topic], strlen_P(xtopics[topic]));
-        webserver_send_content_P(client, PSTR("</td><td>"), 9);
-
-        {
-          String dataValue = actData[0] == '\0' ? "" : getDataValueExtra(actDataExtra, topic);
-          char* str = (char *)dataValue.c_str();
-          webserver_send_content(client, str, strlen(str));
-        }
-
-        webserver_send_content_P(client, PSTR("</td><td>"), 9);
-
-        int maxvalue = atoi(xtopicDescription[topic][0]);
-        int value = actData[0] == '\0' ? 0 : getDataValueExtra(actDataExtra, topic).toInt();
-        if (maxvalue == 0) { //this takes the special case where the description is a real value description instead of a mode, so value should take first index (= 0 + 1)
-          value = 0;
-        }
-        if ((value < 0) || (value > maxvalue)) {
-          webserver_send_content_P(client, _unknown, strlen_P(_unknown));
-        }
-        else {
-          webserver_send_content_P(client, xtopicDescription[topic][value + 1], strlen_P(xtopicDescription[topic][value + 1]));
-
-        }
-
-        webserver_send_content_P(client, PSTR("</td></tr>"), 10);
-        client->content++;
-      }
-      client->content--; // The webserver also increases by 1
-    }
-
-  }
-  return 0;
-}
-
-
-
-int handleJsonOutput(struct webserver_t *client, char* actData, char* actDataExtra, settingsStruct *heishamonSettings, bool extraDataBlockAvailable) {
-  int extraTopics = extraDataBlockAvailable ? NUMBER_OF_TOPICS_EXTRA : 0; //set to 0 if there is no datablock so we don't run json data for it
-  if (client->content == 0) {
-    webserver_send(client, 200, (char *)"application/json", 0);
-    webserver_send_content_P(client, PSTR("{\"heatpump\":["), 13);
-  } else if ((client->content - 1) < NUMBER_OF_TOPICS) {
-    for (uint8_t topic = client->content - 1; topic < NUMBER_OF_TOPICS && topic < client->content + 4 ; topic++) {  //5 TOPS per webserver run (because content was 1 at start, so makes 5)
-
-      webserver_send_content_P(client, PSTR("{\"Topic\":\"TOP"), 13);
-
-      {
-        char str[12];
-        itoa(topic, str, 10);
-        webserver_send_content(client, str, strlen(str));
-      }
-
-      webserver_send_content_P(client, PSTR("\",\"Name\":\""), 10);
-
+      webserver_send_content_P(client, PSTR("</td><td>"), 9);
       webserver_send_content_P(client, topics[topic], strlen_P(topics[topic]));
-
-      if (topic != 44) { //ERROR topic #44 is only one to be a string value
-        webserver_send_content_P(client, PSTR("\",\"Value\":"), 10);
-      }
-      else {
-        webserver_send_content_P(client, PSTR("\",\"Value\":\""), 11);
-      }
+      webserver_send_content_P(client, PSTR("</td><td>"), 9);
 
       {
-        String dataValue = getDataValue(actData, topic);
+        String dataValue = actData[0] == '\0' ? "" : getDataValue(actData, topic);
         char* str = (char *)dataValue.c_str();
         webserver_send_content(client, str, strlen(str));
       }
 
-      if (topic != 44) { //ERROR topic #44 is only one to be a string value
-        webserver_send_content_P(client, PSTR(",\"Description\":\""), 16);
-      } else {
-        webserver_send_content_P(client, PSTR("\",\"Description\":\""), 17);
-      }
+      webserver_send_content_P(client, PSTR("</td><td>"), 9);
 
       int maxvalue = atoi(topicDescription[topic][0]);
       int value = actData[0] == '\0' ? 0 : getDataValue(actData, topic).toInt();
@@ -1251,46 +1155,32 @@ int handleJsonOutput(struct webserver_t *client, char* actData, char* actDataExt
       }
       else {
         webserver_send_content_P(client, topicDescription[topic][value + 1], strlen_P(topicDescription[topic][value + 1]));
+
       }
 
-      webserver_send_content_P(client, PSTR("\"}"), 2);
+      webserver_send_content_P(client, PSTR("</td></tr>"), 10);
+    } else if ((client->content - NUMBER_OF_TOPICS - 1) < extraTopics) {
+      uint8_t topic = client->content - NUMBER_OF_TOPICS - 1;
+      webserver_send_content_P(client, PSTR("<tr><td>XTOP"), 12);
 
-      if (topic < NUMBER_OF_TOPICS - 1) {
-        webserver_send_content_P(client, PSTR(","), 1);
-      }
-      client->content++;
-    }
-    client->content--; // The webserver also increases by 1
-  } else if ((client->content - NUMBER_OF_TOPICS - 1) < extraTopics) {
-    if (client->content == NUMBER_OF_TOPICS + 1) {
-      webserver_send_content_P(client, PSTR("],\"heatpump extra\":["), 20);
-    }
-    for (uint8_t topic = (client->content - NUMBER_OF_TOPICS - 1); topic < extraTopics && topic < (client->content - NUMBER_OF_TOPICS + 4) ; topic++) {
+      char str[12];
+      itoa(topic, str, 10);
+      webserver_send_content(client, str, strlen(str));
 
-      webserver_send_content_P(client, PSTR("{\"Topic\":\"XTOP"), 14);
-
-      {
-        char str[12];
-        itoa(topic, str, 10);
-        webserver_send_content(client, str, strlen(str));
-      }
-
-      webserver_send_content_P(client, PSTR("\",\"Name\":\""), 10);
-
+      webserver_send_content_P(client, PSTR("</td><td>"), 9);
       webserver_send_content_P(client, xtopics[topic], strlen_P(xtopics[topic]));
-
-      webserver_send_content_P(client, PSTR("\",\"Value\":\""), 11);
+      webserver_send_content_P(client, PSTR("</td><td>"), 9);
 
       {
-        String dataValue = getDataValueExtra(actDataExtra, topic);
+        String dataValue = actData[0] == '\0' ? "" : getDataValueExtra(actDataExtra, topic);
         char* str = (char *)dataValue.c_str();
         webserver_send_content(client, str, strlen(str));
       }
 
-      webserver_send_content_P(client, PSTR("\",\"Description\":\""), 17);
+      webserver_send_content_P(client, PSTR("</td><td>"), 9);
 
       int maxvalue = atoi(xtopicDescription[topic][0]);
-      int value = actDataExtra[0] == '\0' ? 0 : getDataValueExtra(actDataExtra, topic).toInt();
+      int value = actData[0] == '\0' ? 0 : getDataValueExtra(actDataExtra, topic).toInt();
       if (maxvalue == 0) { //this takes the special case where the description is a real value description instead of a mode, so value should take first index (= 0 + 1)
         value = 0;
       }
@@ -1299,32 +1189,154 @@ int handleJsonOutput(struct webserver_t *client, char* actData, char* actDataExt
       }
       else {
         webserver_send_content_P(client, xtopicDescription[topic][value + 1], strlen_P(xtopicDescription[topic][value + 1]));
+
       }
 
-      webserver_send_content_P(client, PSTR("\"}"), 2);
-
-      if (topic < (extraTopics - 1)) {
-        webserver_send_content_P(client, PSTR(","), 1);
-      }
-      client->content++;
+      webserver_send_content_P(client, PSTR("</td></tr>"), 10);
     }
-    client->content--; // The webserver also increases by 1
+
+  }
+  return 0;
+}
+
+int handleJsonOutput(struct webserver_t *client, char* actData, char* actDataExtra, settingsStruct *heishamonSettings, bool extraDataBlockAvailable) {
+  int extraTopics = extraDataBlockAvailable ? NUMBER_OF_TOPICS_EXTRA : 0; //set to 0 if there is no datablock so we don't run json data for it
+  if (client->content == 0) {
+    webserver_send(client, 200, (char *)"application/json", 0);
+    webserver_send_content_P(client, PSTR("{\"heatpump\":["), 13);
+  } else if ((client->content - 1) < NUMBER_OF_TOPICS) {
+    uint8_t topic = client->content - 1;
+    webserver_send_content_P(client, PSTR("{\"Topic\":\"TOP"), 13);
+
+    {
+      char str[12];
+      itoa(topic, str, 10);
+      webserver_send_content(client, str, strlen(str));
+    }
+
+    webserver_send_content_P(client, PSTR("\",\"Name\":\""), 10);
+
+    webserver_send_content_P(client, topics[topic], strlen_P(topics[topic]));
+
+    if (topic != 44) { //ERROR topic #44 is only one to be a string value
+      webserver_send_content_P(client, PSTR("\",\"Value\":"), 10);
+    }
+    else {
+      webserver_send_content_P(client, PSTR("\",\"Value\":\""), 11);
+    }
+
+    {
+      String dataValue = getDataValue(actData, topic);
+      char* str = (char *)dataValue.c_str();
+      webserver_send_content(client, str, strlen(str));
+    }
+
+    if (topic != 44) { //ERROR topic #44 is only one to be a string value
+      webserver_send_content_P(client, PSTR(",\"Description\":\""), 16);
+    } else {
+      webserver_send_content_P(client, PSTR("\",\"Description\":\""), 17);
+    }
+
+    int maxvalue = atoi(topicDescription[topic][0]);
+    int value = actData[0] == '\0' ? 0 : getDataValue(actData, topic).toInt();
+    if (maxvalue == 0) { //this takes the special case where the description is a real value description instead of a mode, so value should take first index (= 0 + 1)
+      value = 0;
+    }
+    if ((value < 0) || (value > maxvalue)) {
+      webserver_send_content_P(client, _unknown, strlen_P(_unknown));
+    }
+    else {
+      webserver_send_content_P(client, topicDescription[topic][value + 1], strlen_P(topicDescription[topic][value + 1]));
+    }
+
+    if (topic < NUMBER_OF_TOPICS - 1) {
+      webserver_send_content_P(client, PSTR("\"},"), 3);
+    }
+    else {
+      webserver_send_content_P(client, PSTR("\"}"), 2);
+    }
+  } else if (client->content == NUMBER_OF_TOPICS + 1) {
+    webserver_send_content_P(client, PSTR("],\"heatpump extra\":["), 20);
+  } else if ((client->content - NUMBER_OF_TOPICS - 1) < extraTopics) {
+    uint8_t topic = client->content - NUMBER_OF_TOPICS - 1;
+    webserver_send_content_P(client, PSTR("{\"Topic\":\"XTOP"), 14);
+
+    {
+      char str[12];
+      itoa(topic, str, 10);
+      webserver_send_content(client, str, strlen(str));
+    }
+
+    webserver_send_content_P(client, PSTR("\",\"Name\":\""), 10);
+
+    webserver_send_content_P(client, xtopics[topic], strlen_P(xtopics[topic]));
+
+    webserver_send_content_P(client, PSTR("\",\"Value\":\""), 11);
+
+    {
+      String dataValue = getDataValueExtra(actDataExtra, topic);
+      char* str = (char *)dataValue.c_str();
+      webserver_send_content(client, str, strlen(str));
+    }
+
+    webserver_send_content_P(client, PSTR("\",\"Description\":\""), 17);
+
+    int maxvalue = atoi(xtopicDescription[topic][0]);
+    int value = actDataExtra[0] == '\0' ? 0 : getDataValueExtra(actDataExtra, topic).toInt();
+    if (maxvalue == 0) { //this takes the special case where the description is a real value description instead of a mode, so value should take first index (= 0 + 1)
+      value = 0;
+    }
+    if ((value < 0) || (value > maxvalue)) {
+      webserver_send_content_P(client, _unknown, strlen_P(_unknown));
+    }
+    else {
+      webserver_send_content_P(client, xtopicDescription[topic][value + 1], strlen_P(xtopicDescription[topic][value + 1]));
+    }
+
+    if (topic < extraTopics - 1) {
+      webserver_send_content_P(client, PSTR("\"},"), 3);
+    }
+    else {
+      webserver_send_content_P(client, PSTR("\"}"), 2);
+    }
   } else if (client->content == (NUMBER_OF_TOPICS + extraTopics + 1)) {
     webserver_send_content_P(client, PSTR("]"), 1);
     if (heishamonSettings->use_1wire) {
-      webserver_send_content_P(client, PSTR(",\"1wire\":"), 9);
-      dallasJsonOutput(client);
+      client->content = 2000;
+    } else if (heishamonSettings->use_s0) {
+      client->content = 3000;
+    } else if (heishamonSettings->opentherm) {
+      client->content = 4000;
+    } else {
+      webserver_send_content_P(client, PSTR("}"), 1);
     }
-    if (heishamonSettings->use_s0 ) {
-      webserver_send_content_P(client, PSTR(",\"s0\":"), 6);
-      s0JsonOutput(client);
+  }
+  if (heishamonSettings->use_1wire && client->content >= 2000 && client->content < 2999) {
+    dallasJsonOutput(client);
+  } else if (client->content == 2999) {
+    if (heishamonSettings->use_s0) {
+      client->content = 3000;
+    } else if (heishamonSettings->opentherm) {
+      client->content = 4000;
+    } else {
+      webserver_send_content_P(client, PSTR("}"), 1);
     }
+  }
+  if (heishamonSettings->use_s0 && client->content >= 3000 && client->content < 3999) {
+    s0JsonOutput(client);
+  } else if (client->content == 3999) {
     if (heishamonSettings->opentherm) {
-      webserver_send_content_P(client, PSTR(",\"opentherm\":"), 13);
-      openthermJsonOutput(client);
+      client->content = 4000;
+    } else {
+      webserver_send_content_P(client, PSTR("}"), 1);
     }
+  }
+  if (heishamonSettings->opentherm && client->content >= 4000 && client->content < 4999) {
+    openthermJsonOutput(client);
+  } else if (client->content == 4999) {
     webserver_send_content_P(client, PSTR("}"), 1);
   }
+
   return 0;
 }
 

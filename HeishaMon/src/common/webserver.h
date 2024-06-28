@@ -30,7 +30,7 @@
 #endif
 
 #ifndef WEBSERVER_MAX_SENDLIST
-#define WEBSERVER_MAX_SENDLIST 0
+  #define WEBSERVER_MAX_SENDLIST 10
 #endif
 
 #ifndef WEBSERVER_CLIENT_TIMEOUT
@@ -42,6 +42,52 @@
 #endif
 
 #ifndef __linux__
+  #ifndef MEMP_NUM_PBUF
+    #define MEMP_NUM_PBUF 1024
+  #endif
+  #ifndef MEMP_NUM_TCP_PCB
+    #define MEMP_NUM_TCP_PCB 32
+  #endif
+  #ifndef TCP_MSS
+    #define TCP_MSS 1460
+  #endif
+  #ifndef TCP_WND
+    #define TCP_WND (4*TCP_MSS)
+  #endif
+  #ifndef TCP_OVERSIZE
+    #define TCP_OVERSIZE TCP_MSS
+  #endif
+  #ifndef TCP_SND_QUEUELEN
+    #define TCP_SND_QUEUELEN 512
+  #endif
+  #ifndef MEMP_NUM_TCP_SEG
+    #define MEMP_NUM_TCP_SEG 512
+  #endif
+  #ifndef MEM_SIZE
+    #define MEM_SIZE 65000
+  #endif
+  #ifndef PBUF_POOL_SIZE
+    #define PBUF_POOL_SIZE 1024
+  #endif
+  #ifndef IP_FRAG_USES_STATIC_BUF
+    #define IP_FRAG_USES_STATIC_BUF 0
+  #endif
+  #ifndef TCP_SND_BUF
+    #define TCP_SND_BUF 65535
+  #endif
+  #ifndef PBUF_POOL_BUFSIZE
+    #define PBUF_POOL_BUFSIZE LWIP_MEM_ALIGN_SIZE(1528)
+  #endif
+  #ifndef LWIP_TCP_KEEPALIVE
+    #define LWIP_TCP_KEEPALIVE 1
+  #endif
+  #ifndef LWIP_SO_RCVTIMEO
+    #define LWIP_SO_RCVTIMEO 1
+  #endif
+  #ifndef MEMP_SANITY_CHECK
+    #define MEMP_SANITY_CHECK 0
+  #endif
+
   #include <Arduino.h>
   #include "lwip/opt.h"
   #include "lwip/tcp.h"
@@ -111,6 +157,8 @@ struct WiFiClient {
 typedef struct webserver_t {
   tcp_pcb *pcb;
   WiFiClient *client;
+  char ip[17];
+  uint8_t port;
   unsigned long lastseen;
   unsigned long lastping;
   uint8_t is_websocket:1;
