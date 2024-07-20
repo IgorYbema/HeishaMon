@@ -27,6 +27,7 @@
 #include "decode.h"
 #include "HeishaOT.h"
 #include "commands.h"
+#include "rules.h"
 
 #define MAXCOMMANDSINBUFFER 10
 #define OPTDATASIZE 20
@@ -707,46 +708,223 @@ static void rules_free_stack(void) {
   }
 }
 
-static void rules_print_stack(struct varstack_t *table) {
-  struct array_t *array = NULL;
-  if(table == NULL) {
-    return;
-  } else {
-    uint16_t x = 0;
-    for(x=0;x<table->nr;x++) {
-      array = &table->array[x];
-      switch(array->type) {
-        case VINTEGER: {
-#ifdef ESP8266
-          logprintf_P(F("%2d %s = %d"), x, array->key, array->val.i);
-#else
-          printf("%2d %s = %d\n", x, array->key, array->val.i);
-#endif
-        } break;
-        case VFLOAT: {
-#ifdef ESP8266
-          logprintf_P(F("%2d %s = %g"), x, array->key, array->val.f);
-#else
-          printf("%2d %s = %g\n", x, array->key, array->val.f);
-#endif
-        } break;
-        case VCHAR: {
-#ifdef ESP8266
-          logprintf_P(F("%2d %s = %s"), x, array->key, array->val.s);
-#else
-          printf("%2d %s = %s\n", x, array->key, array->val.s);
-#endif
-        } break;
-        case VNULL: {
-#ifdef ESP8266
-          logprintf_P(F("%d %s = NULL"), x, array->key);
-#else
-          printf("%2d %s = NULL\n", x, array->key);
-#endif
-        } break;
-      }
+void rules_parse_console(void *tmp) {
+  int loop = 1;
+  struct rule_stack_print_t *dat = (struct rule_stack_print_t *)tmp;
+  while(loop) {
+    switch(dat->step) {
+      case 0: {
+        char out[255] = { '\0' };
+        snprintf_P((char *)&out, 255, PSTR("%s %s %s\n%s%d %s %d %s"), PSTR("===="), dat->name, PSTR("===="), PSTR("rule #"), dat->nr, PSTR("was executed in"), dat->time, PSTR("microseconds"));
+
+        if(dat->client == WEBSERVER_MAX_CLIENTS) {
+          if(heishamonSettings.logSerial1) {
+  #if defined(ESP8266)
+            Serial.print(millis());
+            Serial.print(": ");
+            Serial.println(out);
+  #elif defined(ESP32)
+            Serial.print(millis());
+            Serial.print(": ");
+            Serial.println(out);
+  #endif
+          }
+          dat->client = 0;
+          dat->step++;
+          return rules_parse_console(tmp);
+        } else {
+          if(clients[dat->client].data.is_websocket == 1) {
+            return websocket_write(&clients[dat->client++].data, out, strlen(out), dat);
+          } else {
+            dat->client++;
+          }
+        }
+      } break;
+      case 1: {
+        if(dat->client == WEBSERVER_MAX_CLIENTS) {
+          if(heishamonSettings.logSerial1) {
+  #if defined(ESP8266)
+            Serial.print(millis());
+            Serial.print(": ");
+            Serial.println(PSTR("\n>>> local variables\n"));
+  #elif defined(ESP32)
+            Serial.print(millis());
+            Serial.print(": ");
+            Serial.println(PSTR("\n>>> local variables\n"));
+  #endif
+          }
+          dat->client = 0;
+          dat->step++;
+        } else {
+          if(clients[dat->client].data.is_websocket == 1) {
+            loop = 0;
+            websocket_write_P(&clients[dat->client++].data, PSTR("\n>>> local variables\n"), strlen_P(PSTR("\n>>> local variables\n")), dat);
+          } else {
+            dat->client++;
+          }
+        }
+      } break;
+      case 3: {
+        if(dat->client == WEBSERVER_MAX_CLIENTS) {
+          if(heishamonSettings.logSerial1) {
+  #if defined(ESP8266)
+            Serial.print(millis());
+            Serial.print(": ");
+            Serial.println(PSTR("\n>>> global variables\n"));
+  #elif defined(ESP32)
+            Serial.print(millis());
+            Serial.print(": ");
+            Serial.println(PSTR("\n>>> global variables\n"));
+  #endif
+          }
+          dat->client = 0;
+          dat->step++;
+        } else {
+          if(clients[dat->client].data.is_websocket == 1) {
+            loop = 0;
+            websocket_write_P(&clients[dat->client++].data, PSTR("\n>>> global variables\n"), strlen_P(PSTR("\n>>> global variables\n")), dat);
+          } else {
+            dat->client++;
+          }
+        }
+      } break;
+      case 4:
+      case 2: {
+        char *out = NULL;
+        struct array_t *array = NULL;
+        uint16_t l = 0;
+
+        if(dat->table != NULL) {
+          if(dat->idx < dat->table->nr) {
+            array = &dat->table->array[dat->idx];
+            switch(array->type) {
+              case VINTEGER: {
+                l = snprintf_P(NULL, 0, PSTR("%2d %s = %d\n"), dat->idx, array->key, array->val.i);
+              } break;
+              case VFLOAT: {
+                l = snprintf_P(NULL, 0, PSTR("%2d %s = %g\n"), dat->idx, array->key, array->val.f);
+              } break;
+              case VCHAR: {
+                l = snprintf_P(NULL, 0, PSTR("%2d %s = %s\n"), dat->idx, array->key, array->val.s);
+              } break;
+              case VNULL: {
+                l = snprintf_P(NULL, 0, PSTR("%d %s = NULL\n"), dat->idx, array->key);
+              } break;
+            }
+
+            if((out = (char *)malloc(l+1)) == NULL) {
+              logprintf_P(F("Not enough memory for rules console output %s:#%d"), __FUNCTION__, __LINE__);
+              return;
+            }
+            memset(out, 0, l+1);
+
+            switch(array->type) {
+              case VINTEGER: {
+                snprintf_P(out, l, PSTR("%2d %s = %d\n"), dat->idx, array->key, array->val.i);
+              } break;
+              case VFLOAT: {
+                snprintf_P(out, l, PSTR("%2d %s = %g\n"), dat->idx, array->key, array->val.f);
+              } break;
+              case VCHAR: {
+                snprintf_P(out, l, PSTR("%2d %s = %s\n"), dat->idx, array->key, array->val.s);
+              } break;
+              case VNULL: {
+                snprintf_P(out, l, PSTR("%d %s = NULL\n"), dat->idx, array->key);
+              } break;
+            }
+
+            if(dat->client == WEBSERVER_MAX_CLIENTS) {
+              if(heishamonSettings.logSerial1) {
+        #if defined(ESP8266)
+                Serial.print(millis());
+                Serial.print(": ");
+                Serial.println(out);
+        #elif defined(ESP32)
+                Serial.print(millis());
+                Serial.print(": ");
+                Serial.println(out);
+        #endif
+              }
+              if(dat->idx == dat->table->nr) {
+                if(dat->step == 2) {
+                  dat->table = &global_varstack;
+                  dat->client = 0;
+                  dat->idx = 0;
+                  dat->step++;
+                } else {
+                  loop = 0;
+                  free(tmp);
+                  rules_free_stack();
+                }
+              } else {
+                dat->client = 0;
+                dat->idx++;
+              }
+            } else {
+              if(clients[dat->client].data.is_websocket == 1) {
+                loop = 0;
+                websocket_write(&clients[dat->client++].data, out, strlen(out), tmp);
+              } else {
+                dat->client++;
+              }
+            }
+            free(out);
+          } else {
+            dat->step++;
+          }
+        } else {
+          if(dat->step == 2) {
+            dat->table = &global_varstack;
+            dat->client = 0;
+            dat->idx = 0;
+            dat->step++;
+          } else {
+            free(tmp);
+            rules_free_stack();
+            loop = 0;
+          }
+        }
+      } break;
+      case 5: {
+        loop = 0;
+      } break;
     }
   }
+}
+
+static void rules_print_stack(char *name, uint8_t nr, int time, struct varstack_t *table) {
+  struct rule_stack_print_t *tmp = (struct rule_stack_print_t *)malloc(sizeof(struct rule_stack_print_t));
+  if(tmp == NULL) {
+#if defined(ESP8266) || defined(ESP32)
+    Serial1.printf("Out of memory %s:#%d\n", __FUNCTION__, __LINE__);
+    ESP.restart();
+    exit(-1);
+#elif defined(ESP32)
+    Serial.printf("Out of memory %s:#%d\n", __FUNCTION__, __LINE__);
+    ESP.restart();
+    exit(-1);
+#endif
+  }
+  tmp->route = 1;
+  tmp->client = 0;
+  tmp->step = 0;
+  tmp->table = table;
+  tmp->idx = 0;
+  if((tmp->name = strdup(name)) == NULL) {
+#if defined(ESP8266) || defined(ESP32)
+    Serial1.printf("Out of memory %s:#%d\n", __FUNCTION__, __LINE__);
+    ESP.restart();
+    exit(-1);
+#elif defined(ESP32)
+    Serial.printf("Out of memory %s:#%d\n", __FUNCTION__, __LINE__);
+    ESP.restart();
+    exit(-1);
+#endif
+  }
+  tmp->time = time;
+  tmp->nr = nr;
+
+  rules_parse_console(tmp);
 }
 
 void rules_timer_cb(int nr) {
@@ -760,12 +938,8 @@ void rules_timer_cb(int nr) {
   memset(name, 0, i+2);
   snprintf_P(name, i+1, PSTR("timer=%d"), nr);
 
-  // logprintf_P(F("_______ %s %s"), __FUNCTION__, name);
-
   nr = rule_by_name(rules, nrrules, name);
   if(nr > -1) {
-    logprintf_P(F("%s %s %s"), F("===="), name, F("===="));
-
     timestamp.first = micros();
 
     int ret = rule_run(rules[nr], 0);
@@ -773,13 +947,7 @@ void rules_timer_cb(int nr) {
     timestamp.second = micros();
 
     if(ret == 0) {
-      logprintf_P(F("%s%d %s %d %s"), F("rule #"), rules[nr]->nr, F("was executed in"), timestamp.second - timestamp.first, F("microseconds"));
-
-      logprintf_P(F("\n>>> local variables\n"));
-      rules_print_stack((struct varstack_t *)rules[nr]->userdata);
-      logprintf_P(F("\n>>> global variables\n"));
-      rules_print_stack(&global_varstack);
-      rules_free_stack();
+      rules_print_stack(name, nr, timestamp.second - timestamp.first, (struct varstack_t *)rules[nr]->userdata);
     }
   }
   FREE(name);
@@ -918,8 +1086,6 @@ void rules_event_cb(const char *prefix, const char *name) {
   snprintf_P((char *)&buf, 100, PSTR("%s%s"), prefix, name);
   int8_t nr = rule_by_name(rules, nrrules, (char *)buf);
   if(nr > -1) {
-    logprintf_P(F("%s %s %s"), F("===="), name, F("===="));
-
     timestamp.first = micros();
 
     int ret = rule_run(rules[nr], 0);
@@ -927,13 +1093,7 @@ void rules_event_cb(const char *prefix, const char *name) {
     timestamp.second = micros();
 
     if(ret == 0) {
-      logprintf_P(F("%s%d %s %d %s"), F("rule #"), rules[nr]->nr, F("was executed in"), timestamp.second - timestamp.first, F("microseconds"));
-
-      logprintf_P(F("\n>>> local variables\n"));
-      rules_print_stack((struct varstack_t *)rules[nr]->userdata);
-      logprintf_P(F("\n>>> global variables\n"));
-      rules_print_stack(&global_varstack);
-      rules_free_stack();
+      rules_print_stack((char *)name, rules[nr]->nr, timestamp.second - timestamp.first, (struct varstack_t *)rules[nr]->userdata);
     }
 
     return;
@@ -943,8 +1103,6 @@ void rules_event_cb(const char *prefix, const char *name) {
 void rules_boot(void) {
   int8_t nr = rule_by_name(rules, nrrules, (char *)"System#Boot");
   if(nr > -1) {
-    logprintf_P(F("%s %s %s"), F("===="), F("System#Boot"), F("===="));
-
     timestamp.first = micros();
 
     int ret = rule_run(rules[nr], 0);
@@ -952,13 +1110,7 @@ void rules_boot(void) {
     timestamp.second = micros();
 
     if(ret == 0) {
-      logprintf_P(F("%s%d %s %d %s"), F("rule #"), rules[nr]->nr, F("was executed in"), timestamp.second - timestamp.first, F("microseconds"));
-
-      logprintf_P(F("\n>>> local variables\n"));
-      rules_print_stack((struct varstack_t *)rules[nr]->userdata);
-      logprintf_P(F("\n>>> global variables\n"));
-      rules_print_stack(&global_varstack);
-      rules_free_stack();
+      rules_print_stack((char *)"System#Boot", nr, timestamp.second - timestamp.first, (struct varstack_t *)rules[nr]->userdata);
     }
   }
 }
@@ -976,9 +1128,8 @@ void rules_deinitialize() {
         }
       }
       rules_gc(&rules, &nrrules);
-	  rules_free_stack();
+      rules_free_stack();
     }
-
 
     // set this to NULL so a new initialize can start if necessary. 
     rule_options.event_cb = NULL;

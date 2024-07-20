@@ -23,7 +23,6 @@
 
 void log_message(char* string);
 
-
 static IPAddress apIP(192, 168, 4, 1);
 
 struct settingsStruct {

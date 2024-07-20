@@ -19,6 +19,17 @@
 
 extern uint8_t nrrules;
 
+typedef struct rule_stack_print_t {
+  uint8_t route;
+  uint8_t client;
+  uint8_t step;
+  struct varstack_t *table;
+  char *name;
+  int time;
+  uint8_t nr;
+  uint8_t idx;
+} rule_stack_print_t;
+
 void rules_boot(void);
 void rules_deinitialize(void);
 int rules_parse(char *file);
@@ -26,5 +37,6 @@ void rules_setup(void);
 void rules_timer_cb(int nr);
 void rules_event_cb(const char *prefix, const char *name);
 void rules_execute(void);
+void rules_parse_console(void *tmp);
 
 #endif

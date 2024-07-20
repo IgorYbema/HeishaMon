@@ -397,7 +397,7 @@ void log_message(char* string)
       mqtt_client.disconnect();
     }
   }
-  websocket_write_all(log_line, strlen(log_line));
+  websocket_write_all(log_line, strlen(log_line), NULL);
   free(log_line);
 #ifdef ESP32
   if (!inSetup) blinkNeoPixel(false);
@@ -562,7 +562,6 @@ bool readSerial()
       if (data_length == DATASIZE)  {  //receive a full data block
         if  (data[3] == 0x10) { //decode the normal data block
           decode_heatpump_data(data, actData, mqtt_client, log_message, heishamonSettings.mqtt_topic_base, heishamonSettings.updateAllTime);
-          memcpy(actData, data, DATASIZE);
           {
             char mqtt_topic[256];
             sprintf(mqtt_topic, "%s/raw/data", heishamonSettings.mqtt_topic_base);
@@ -573,7 +572,6 @@ bool readSerial()
         } else if (data[3] == 0x21) { //decode the new model extra data block
           extraDataBlockAvailable = true; //set the flag to true so we know we can request this data always
           decode_heatpump_data_extra(data, actDataExtra, mqtt_client, log_message, heishamonSettings.mqtt_topic_base, heishamonSettings.updateAllTime);
-          memcpy(actDataExtra, data, DATASIZE);
           {
             char mqtt_topic[256];
             sprintf(mqtt_topic, "%s/raw/dataextra", heishamonSettings.mqtt_topic_base);
@@ -739,8 +737,21 @@ void setupOTA() {
   ArduinoOTA.begin();
 }
 
+struct websocket_dat_t {
+  uint8_t route;
+} websocket_dat_t;
+
 int8_t webserver_cb(struct webserver_t *client, void *dat) {
   switch (client->step) {
+    case WEBSERVER_CLIENT_WEBSOCKET: {
+      if(dat != NULL) {
+        struct websocket_dat_t *tmp = (struct websocket_dat_t *)dat;
+        if(tmp->route == 1) {
+          rules_parse_console((void *)tmp);
+        }
+      }
+      return 0;
+    } break;
     case WEBSERVER_CLIENT_REQUEST_METHOD: {
         if (strcmp_P((char *)dat, PSTR("POST")) == 0) {
           client->route = 110;

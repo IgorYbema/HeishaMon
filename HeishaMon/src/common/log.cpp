@@ -31,7 +31,7 @@ void _logprintln(const char *file, unsigned int line, char *msg) {
     Serial.println(msg);
 #endif	  
   }
-  websocket_write_all(msg, strlen(msg));
+  websocket_write_all(msg, strlen(msg), NULL);
 }
 
 void _logprintf(const char *file, unsigned int line, char *fmt, ...) {
