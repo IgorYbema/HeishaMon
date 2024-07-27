@@ -270,6 +270,8 @@ void check_wifi()
       }
 
       ntpReload(&heishamonSettings);
+      logprintln_P(F("Syncing with ntp servers, check again in 5 minutes"));
+      timerqueue_insert(300, 0, -6);
     }
 
     /*
@@ -1338,6 +1340,26 @@ void timer_cb(int nr) {
             }
           }
           rules_boot();
+        } break;
+      case -5: {
+          ntpReload(&heishamonSettings);
+          logprintln_P(F("Syncing with ntp servers, check again in 5 minutes"));
+          timerqueue_insert(300, 0, -6);
+        } break;
+      case -6: {
+          time_t now = time(NULL);
+          struct tm *tm_struct = localtime(&now);
+          if(tm_struct->tm_year == 1970) {
+            ntpReload(&heishamonSettings);
+            logprintln_P(F("Syncing with ntp servers, check again in 5 minutes"));
+            timerqueue_insert(300, 0, -5);
+          } else {
+            /*
+             * Wait 300 sec less than a full day
+             */
+            logprintln_P(F("Syncing with ntp servers, check again in a day"));
+            timerqueue_insert(86100, 0, -5);
+          }
         } break;
     }
   }
