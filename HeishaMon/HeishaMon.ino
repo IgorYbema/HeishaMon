@@ -1206,6 +1206,7 @@ void setupSerial() {
 #endif    
     loggingSerial.print(F("Starting debugging, version: "));
     loggingSerial.println(heishamon_version);
+    loggingSerial.println(heishamon_board);
   }
 #if defined(ESP8266)
   else {
@@ -1728,6 +1729,8 @@ void loop() {
     stats += timeoutread;
     stats += F(",\"version\":\"");
     stats += heishamon_version;
+    stats += F(",\"board\":\"");
+    stats += heishamon_board;
     stats += F("\",\"rules active\":");
     stats += nrrules;
     stats += F("}");
