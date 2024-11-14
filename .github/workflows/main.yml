@@ -15,7 +15,7 @@ jobs:
 
       - name: Update version.h
         if: github.ref != 'refs/heads/main' #do not change version in main branch run
-        run: cd HeishaMon && echo "static const char *heishamon_version = \"Alpha-$(git rev-parse --short HEAD)\";" > version.h && cat version.h
+        run: cd HeishaMon && sed -r -i "s/heishamon_version = .+/heishamon_version = \"Alpha-$(git rev-parse --short HEAD)\";/"  version.h && cat version.h
         shell: bash
 
       - name: Setup Arduino CLI
@@ -51,7 +51,7 @@ jobs:
         shell: bash        
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: HeishaMon.ino.bin
           path: HeishaMon/HeishaMon_*.bin
