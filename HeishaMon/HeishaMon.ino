@@ -445,9 +445,8 @@ void mqttPublish(char* topic, char* subtopic, char* value, bool retain) {
 byte calcChecksum(byte* command, int length) {
   byte chk = 0;
   for ( int i = 0; i < length; i++)  {
-    chk += command[i];
+    chk -= command[i];
   }
-  chk = (chk ^ 0xFF) + 01;
   return chk;
 }
 
