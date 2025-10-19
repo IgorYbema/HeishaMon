@@ -725,8 +725,28 @@ int settingsReconnectWifi(struct webserver_t *client, settingsStruct *heishamonS
 
   return 0;
 }
-
 int getSettings(struct webserver_t *client, settingsStruct *heishamonSettings) {
+    switch (client->content) {
+    case 0: {
+        JsonDocument jsonDoc;
+        settingsToJson(jsonDoc, heishamonSettings); //stores current settings in a json document  
+        int size = measureJson(jsonDoc);
+        char* buffer = (char*)malloc(size+1);
+        if (buffer == nullptr) {
+            //alloc failed
+            log_message(_F("Failed to initialize buffer for getsettings serialize json"));
+            return -1;
+        }
+        serializeJson(jsonDoc, buffer, size);
+        webserver_send(client, 200, (char *)"application/json", 0);
+        webserver_send_content(client, buffer, size);
+        free(buffer);
+      }  break;
+    }
+  return 0;
+}
+
+int getSettingsOld(struct webserver_t *client, settingsStruct *heishamonSettings) {
   switch (client->content) {
     case 0: {
         webserver_send(client, 200, (char *)"application/json", 0);
