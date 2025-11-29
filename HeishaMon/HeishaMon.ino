@@ -132,9 +132,19 @@ static uint8_t cmdnrel = 0;
 
 
 // mqtt
+#ifdef TLS_SUPPORT
+#include <WiFiClientSecure.h>
+WiFiClientSecure mqtt_tls_client;
 WiFiClient mqtt_wifi_client;
+bool loadTlsCaFromFS(WiFiClientSecure &client);
+static bool last_tls_enabled = false;
+static bool new_ca_stored = false;
+static std::unique_ptr<char[]> persistent_ca_pem;
 PubSubClient mqtt_client;
-
+#else
+WiFiClient mqtt_wifi_client;
+PubSubClient mqtt_client(mqtt_wifi_client);
+#endif
 
 
 bool firstConnectSinceBoot = true; //if this is true there is no first connection made yet
@@ -307,6 +317,34 @@ void check_wifi() {
 }
 
 
+#ifdef TLS_SUPPORT
+bool loadTlsCaFromFS(WiFiClientSecure &client) {
+  if (!LittleFS.exists("/ca.pem")) {
+    log_message(_F("[TLS] /ca.pem not found"));
+    return false;
+  }
+  File certFile = LittleFS.open("/ca.pem", "r");
+  if (!certFile) {
+    log_message(_F("[TLS] open(/ca.pem) failed"));
+    return false;
+  }
+  size_t certSize = certFile.size();
+  if (certSize == 0) {
+    log_message(_F("[TLS] /ca.pem is empty"));
+    certFile.close();
+    return false;
+  }
+  persistent_ca_pem.reset(new char[certSize + 1]);
+  size_t n = certFile.readBytes(persistent_ca_pem.get(), certSize);
+  persistent_ca_pem[n] = '\0';
+  certFile.close();
+  client.setCACert(persistent_ca_pem.get());
+  log_message(_F("[TLS] CA loaded into client"));
+  return true;
+}
+#endif
+
+
 void mqtt_reconnect()
 {
   unsigned long now = millis();
@@ -319,6 +357,36 @@ void mqtt_reconnect()
     }
     char topic[256];
     sprintf(topic, "%s/%s", heishamonSettings.mqtt_topic_base, mqtt_willtopic);
+#ifdef TLS_SUPPORT
+    if (heishamonSettings.mqtt_tls_enabled != last_tls_enabled) {
+      mqtt_client.disconnect();
+      if (last_tls_enabled) {
+        mqtt_tls_client.stop();
+      } else {
+        mqtt_wifi_client.stop();
+        if (!loadTlsCaFromFS(mqtt_tls_client)) {
+          log_message(_F("[TLS] Proceeding without valid CA (expect failure)"));
+        }
+      }
+      last_tls_enabled = heishamonSettings.mqtt_tls_enabled;
+    }
+
+    if (new_ca_stored) {
+      log_message(_F("[TLS] Trying to load new CA ertificate"));
+      if (!loadTlsCaFromFS(mqtt_tls_client)) {
+        log_message(_F("[TLS] Proceeding without valid CA (expect failure)"));
+      }
+      new_ca_stored = false;
+    }
+    if (heishamonSettings.mqtt_tls_enabled) {
+      mqtt_client.setClient(mqtt_tls_client);
+    } else {
+      mqtt_client.setClient(mqtt_wifi_client);
+    }
+      mqtt_client.setSocketTimeout(10);
+      mqtt_client.setKeepAlive(30);
+      mqtt_client.setServer(heishamonSettings.mqtt_server, atoi(heishamonSettings.mqtt_port));
+#endif
     if (mqtt_client.connect(heishamonSettings.wifi_hostname, heishamonSettings.mqtt_username, heishamonSettings.mqtt_password, topic, 1, true, "Offline"))
     {
       mqttReconnects++;
@@ -363,6 +431,20 @@ void mqtt_reconnect()
       }
 #endif
     }
+//#ifdef TLS_SUPPORT // error state is useful in any case
+    else {
+      int8_t err = mqtt_client.state();
+      log_message(_F("MQTT connect failed, state:"));
+      switch (err) {
+        case -1: log_message(_F(" -1 → TLS handshake or network error")); break;
+        case -2: log_message(_F(" -2 → Connection timeout – cannot reach broker or CA/time error")); break;
+        case -3: log_message(_F(" -3 → Server not found or rejected")); break;
+        case -4: log_message(_F(" -4 → Connection lost")); break;
+        case -5: log_message(_F(" -5 → Check username/password")); break;
+        default: log_message(_F("    → Unknown error")); break;
+      }
+    }
+//#endif
   }
 }
 
@@ -809,6 +891,18 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
               LittleFS.remove("/rules.new");
               client->userdata = new File(LittleFS.open("/rules.new", "a+"));
             }
+#ifdef TLS_SUPPORT
+        } else if (strcmp_P((char *)dat, PSTR("/cacert")) == 0) {
+          client->route = 165;
+          if (LittleFS.begin()) {
+            LittleFS.remove("/ca.tmp");
+            File cf = LittleFS.open("/ca.tmp", "w");
+            if (cf) {
+              client->userdata = new File(cf);
+            }
+            new_ca_stored = true;
+          }
+#endif
           } else if (strcmp_P((char *)dat, PSTR("/firmware")) == 0) {
             if (!Update.isRunning()) {
 #ifdef ESP8266
@@ -836,6 +930,10 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
           client->route = 140;
         } else if (strcmp_P((char *)dat, PSTR("/rules")) == 0) {
           client->route = 160;
+#ifdef TLS_SUPPORT
+        } else if (strcmp_P((char *)dat, PSTR("/cacert")) == 0) {
+          client->route = 166; 
+#endif
         } else if (strcmp_P((char *)dat, PSTR("/scandallas")) == 0) {
           client->route = 180;          
         } else {
@@ -940,6 +1038,15 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
                 f->write(args->value, args->len);
               }
             } break;
+#ifdef TLS_SUPPORT            
+          case 165: {
+              File *f = (File *)client->userdata;
+              if (f && *f && args->len > 0) {
+                  f->write((const uint8_t*)args->value, (size_t)args->len);
+              }
+              return 0;
+            } break;
+#endif
         }
       } break;
     case WEBSERVER_CLIENT_HEADER: {
@@ -1065,6 +1172,20 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
           case 160: {
               return showRules(client);
             } break;
+#ifdef TLS_SUPPORT
+        case 165: {
+          if (client->userdata) {
+            File *pf = (File *)client->userdata;
+            pf->close();
+            delete pf;
+            client->userdata = NULL;
+          }
+          return handleCACert(client);
+        } break;
+        case 166: {
+          return showCACert(client);
+        } break; 
+#endif  
           case 170: {
               File *f = (File *)client->userdata;
               if (f) {
@@ -1127,6 +1248,9 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
               }
             } break;
           case 160:
+#ifdef TLS_SUPPORT
+          case 165:
+#endif
           case 170: {
               if (client->userdata != NULL) {
                 File *f = (File *)client->userdata;
@@ -1270,9 +1394,21 @@ void switchSerial() {
 }
 
 void setupMqtt() {
-  mqtt_client.setClient(mqtt_wifi_client);
   mqtt_client.setBufferSize(1024);
+#ifdef TLS_SUPPORT
+  mqtt_client.setSocketTimeout(8); mqtt_client.setKeepAlive(30); //fast timeout, any slower than 10s will block the main loop too long (8s might be even safer to avoid reboots on bad wifi); short keepalive may lead to problems with TLS
+  if (heishamonSettings.mqtt_tls_enabled) {
+    if (!loadTlsCaFromFS(mqtt_tls_client)) {
+      log_message(_F("[TLS] Proceeding without valid CA (expect failure)"));
+    }
+    mqtt_client.setClient(mqtt_tls_client);
+  } else {
+    mqtt_client.setClient(mqtt_wifi_client);
+  }
+  last_tls_enabled = heishamonSettings.mqtt_tls_enabled;
+#else
   mqtt_client.setSocketTimeout(10); mqtt_client.setKeepAlive(5); //fast timeout, any slower will block the main loop too long
+#endif
   mqtt_client.setServer(heishamonSettings.mqtt_server, atoi(heishamonSettings.mqtt_port));
   mqtt_client.setCallback(mqtt_callback);
 }
@@ -1447,8 +1583,9 @@ void setup() {
   setupETH();
 #endif
 
-  loggingSerial.println(F("Setup MQTT..."));
-  setupMqtt();
+//  loggingSerial.println(F("Setup MQTT..."));
+//  setupMqtt();
+//shifted - TLS requires correct time
 
   loggingSerial.println(F("Setup HTTP..."));
   setupHttp();
@@ -1457,6 +1594,9 @@ void setup() {
   sntp_stop();
   sntp_setoperatingmode(SNTP_OPMODE_POLL);
   sntp_init();
+
+  loggingSerial.println(F("Setup MQTT..."));
+  setupMqtt();
 
   loggingSerial.println(F("Switch serial..."));
   switchSerial(); //switch serial to gpio13/gpio15
