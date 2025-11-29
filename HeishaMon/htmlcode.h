@@ -345,7 +345,7 @@ static const char settingsJS[] PROGMEM =
   "    }"
   "</script>";
 
-#ifdef TLS_SUPPORT
+#ifdef TLS_SUPPORT 
 static const char caUploadJS[] PROGMEM =
   "<script>"
   "  (function(){"

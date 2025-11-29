@@ -217,7 +217,7 @@ void loadSettings(settingsStruct *heishamonSettings) {
           if ( jsonDoc["ntp_servers"] ) strlcpy(heishamonSettings->ntp_servers, jsonDoc["ntp_servers"], sizeof(heishamonSettings->ntp_servers));
           if ( jsonDoc["timezone"]) heishamonSettings->timezone = jsonDoc["timezone"];
 #ifdef TLS_SUPPORT
-          heishamonSettings->mqtt_tls_enabled = ( jsonDoc["mqtt_tls_enabled"] == "enabled" ) ? true : false;
+          heishamonSettings->mqtt_tls_enabled = ( jsonDoc["mqtt_tls_enabled"] == "enabled" ) ? true : false; 
 #endif
           heishamonSettings->force_rules = ( jsonDoc["force_rules"] == "enabled" ) ? true : false;
           heishamonSettings->use_1wire = ( jsonDoc["use_1wire"] == "enabled" ) ? true : false;

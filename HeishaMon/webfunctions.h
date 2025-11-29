@@ -107,7 +107,7 @@ int showRules(struct webserver_t *client);
 int showFirmware(struct webserver_t *client);
 int showFirmwareSuccess(struct webserver_t *client);
 int showFirmwareFail(struct webserver_t *client);
-#ifdef TLS_SUPPORT
+#ifdef TLS_SUPPORT 
 int handleCACert(struct webserver_t *client);
 int showCACert(struct webserver_t *client);
 #endif
