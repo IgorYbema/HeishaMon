@@ -228,7 +228,7 @@ SET38 | SetBivalentAPStopTemp | Set bivalent adv. par. stop temp | -15 to 35
 SET39 | SetHeatingControl | Set heating control | 0=comfort, 1=efficiency
 SET40 | SetSmartDHW | Set SmartDHW | 0=variable, 1=standard
 SET41 | SetQuietModePriority | Set Quiet Mode Priority | 0=sound, 1=capacity
-
+SET42 | SetPumpFlowrate | Set Pump Flowrate | 0=deltaT, 1=max. duty
 
 *If you operate your heatpump in water mode with direct temperature setup: topics ending xxxRequestTemperature will set the absolute target temperature.*
 
