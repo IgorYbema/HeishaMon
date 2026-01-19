@@ -939,7 +939,7 @@ unsigned int set_quiet_mode_priority(char *msg, unsigned char *cmd, char *log_ms
   return sizeof(panasonicSendQuery);
 }
 
-unsigned int set_pump_flowrate(char *msg, unsigned char *cmd, char *log_msg) {
+unsigned int set_pump_flowrate_mode(char *msg, unsigned char *cmd, char *log_msg) {
 
   const byte address=29;
   byte value = 0b01;
@@ -950,7 +950,7 @@ unsigned int set_pump_flowrate(char *msg, unsigned char *cmd, char *log_msg) {
 
   {
     char tmp[256] = { 0 };
-    snprintf_P(tmp, 255, PSTR("set pump flowrate %d"), value - 1);
+    snprintf_P(tmp, 255, PSTR("set pump flowrate mode %d"), value - 1);
     memcpy(log_msg, tmp, sizeof(tmp));
   }
 
