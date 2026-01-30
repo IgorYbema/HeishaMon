@@ -226,7 +226,7 @@ void check_wifi() {
         WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
         WiFi.softAP(_F("HeishaMon-Setup"));
       }
-      if ((wifistatus == WL_STOPPED  ) && (WiFi.softAPgetStationNum() == 0)) { //make sure we start STA again if it was stopped
+      if (((wifistatus == WL_STOPPED) || (wifistatus == WL_DISCONNECTED))  && (WiFi.softAPgetStationNum() == 0)) { //make sure we start STA again if it was stopped or disconnected
         log_message(_F("Retrying configured WiFi, ..."));
         WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN); //select best AP with same SSID
 #endif
@@ -235,11 +235,9 @@ void check_wifi() {
         } else {
           WiFi.begin(heishamonSettings.wifi_ssid, heishamonSettings.wifi_password);
         }
-#ifdef ESP8266        
       } else {
         log_message(_F("Reconnecting to WiFi failed. Waiting a few seconds before trying again."));
         WiFi.disconnect(true);
-#endif        
       }
     }
   }
