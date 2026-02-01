@@ -1,11 +1,13 @@
-// heisha_web.h - Modernized web interface for HeishaMon
-// All original functionality preserved: WebSocket updates, tabbed dashboard,
-// settings, firmware upload, rules editor, wifi scanning, timezone data.
+#if defined(ESP8266)
+  #define FLASHPROG PROGMEM
+#else
+  #define FLASHPROG  // ESP32 ignores FLASHPROG, makes sure compiler uses the .rodata instead of .data for consts when confusing for PROGMEM
+#endif
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SHARED CSS
 // ─────────────────────────────────────────────────────────────────────────────
-static const char webCSS[] PROGMEM =
+static const char webCSS[] FLASHPROG =
   "<style>"
   "@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap');"
 
@@ -453,7 +455,7 @@ static const char webCSS[] PROGMEM =
 // ─────────────────────────────────────────────────────────────────────────────
 // HTML HEAD
 // ─────────────────────────────────────────────────────────────────────────────
-static const char webHeader[] PROGMEM =
+static const char webHeader[] FLASHPROG =
   "<!DOCTYPE html>"
   "<html lang='en'>"
   "<head>"
@@ -461,13 +463,13 @@ static const char webHeader[] PROGMEM =
   "<meta name='viewport' content='width=device-width, initial-scale=1'>"
   "<title>Heisha Monitor</title>";
 
-static const char refreshMeta[] PROGMEM =
+static const char refreshMeta[] FLASHPROG =
   "<meta http-equiv='refresh' content='5; url=/' />";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BODY START (shared top bar structure — version injected server-side)
 // ─────────────────────────────────────────────────────────────────────────────
-static const char webBodyStart[] PROGMEM =
+static const char webBodyStart[] FLASHPROG =
   "</head>"
   "<body>"
 
@@ -495,12 +497,12 @@ static const char webBodyStart[] PROGMEM =
   "  <div class='topbar-right'></div>"
   "</header>";
 
-static const char webFooter[] PROGMEM = "</body></html>";
+static const char webFooter[] FLASHPROG = "</body></html>";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MENU & WEBSOCKET JS (shared across pages)
 // ─────────────────────────────────────────────────────────────────────────────
-static const char menuJS[] PROGMEM =
+static const char menuJS[] FLASHPROG =
   "<script>"
   "function toggleMenu(){"
   "  var m=document.getElementById('sideMenu');"
@@ -514,7 +516,7 @@ static const char menuJS[] PROGMEM =
   "}"
   "</script>";
 
-static const char websocketJS[] PROGMEM =
+static const char websocketJS[] FLASHPROG =
   "<script>"
   "var bConnected=false;"
   "var inactivityTimeout=5000;"
@@ -599,7 +601,7 @@ static const char websocketJS[] PROGMEM =
 // ─────────────────────────────────────────────────────────────────────────────
 // ROOT PAGE: tab switching + data refresh JS
 // ─────────────────────────────────────────────────────────────────────────────
-static const char selectJS[] PROGMEM =
+static const char selectJS[] FLASHPROG =
   "<script>"
   "function openTable(name){"
   "  var panes=document.getElementsByClassName('tab-pane');"
@@ -611,7 +613,7 @@ static const char selectJS[] PROGMEM =
   "}"
   "</script>";
 
-static const char refreshJS[] PROGMEM =
+static const char refreshJS[] FLASHPROG =
   "<script>"
   "var isEditing=false;"
   "document.body.onload=function(){"
@@ -725,7 +727,7 @@ static const char refreshJS[] PROGMEM =
 // We build the nav + status bar in one block, then the tab panes.
 
 // Part 1: inject side-nav items & version via inline script, then status bar
-static const char webBodyRoot1[] PROGMEM =
+static const char webBodyRoot1[] FLASHPROG =
   "<script>"
   "document.addEventListener('DOMContentLoaded',function(){"
   "  var nav=document.getElementById('sideNav');"
@@ -740,7 +742,7 @@ static const char webBodyRoot1[] PROGMEM =
   "  document.getElementById('sideVersion').textContent='v";
 
 // server inserts version string here, then webBodyRoot2 follows
-static const char webBodyRoot2[] PROGMEM =
+static const char webBodyRoot2[] FLASHPROG =
   "';"
   "});"
   "</script>"
@@ -761,7 +763,7 @@ static const char webBodyRoot2[] PROGMEM =
   "</div>";
 
 // listen-only badge (conditionally appended server-side before tabs)
-static const char webBodyRootStatusListenOnly[] PROGMEM =
+static const char webBodyRootStatusListenOnly[] FLASHPROG =
   "<script>document.addEventListener('DOMContentLoaded',function(){"
   "  var bar=document.getElementById('statusBar');"
   "  var chip=document.createElement('div');"
@@ -773,36 +775,36 @@ static const char webBodyRootStatusListenOnly[] PROGMEM =
 // The server still inserts live values between these fragments in sequence:
 //   print(Wifi) -> print(wifiVal) -> print(Memory) -> print(memVal) -> ... -> print(EndSpan)
 // Wrap as HTML comment boundaries so injected values are invisible:
-static const char webBodyRootStatusWifi[] PROGMEM = "<!--";
+static const char webBodyRootStatusWifi[] FLASHPROG = "<!--";
 #ifdef ESP8266
-static const char webBodyRootStatusMemory[] PROGMEM = "--><!--";
+static const char webBodyRootStatusMemory[] FLASHPROG = "--><!--";
 #else
-static const char webBodyRootStatusEthernet[] PROGMEM = "--><!--";
-static const char webBodyRootStatusMemory[] PROGMEM = "--><!--";
+static const char webBodyRootStatusEthernet[] FLASHPROG = "--><!--";
+static const char webBodyRootStatusMemory[] FLASHPROG = "--><!--";
 #endif
-static const char webBodyRootStatusReceived[] PROGMEM = "--><!--";
-static const char webBodyRootStatusReconnects[] PROGMEM = "--><!--";
-static const char webBodyRootStatusUptime[] PROGMEM = "--><!--";
-static const char webBodyRootStatusEndSpan[] PROGMEM = "-->";
+static const char webBodyRootStatusReceived[] FLASHPROG = "--><!--";
+static const char webBodyRootStatusReconnects[] FLASHPROG = "--><!--";
+static const char webBodyRootStatusUptime[] FLASHPROG = "--><!--";
+static const char webBodyRootStatusEndSpan[] FLASHPROG = "-->";
 
 // Tab navigation bar
-static const char webTabnavOpen[] PROGMEM =
+static const char webTabnavOpen[] FLASHPROG =
   "<nav class='tabnav'>"
   "  <button class='tabnav-btn active' data-tab='Heatpump' onclick=\"openTable('Heatpump')\">Heatpump</button>";
-static const char webBodyRootDallasTab[] PROGMEM =
+static const char webBodyRootDallasTab[] FLASHPROG =
   "<button class='tabnav-btn' data-tab='Dallas' onclick=\"openTable('Dallas')\">Dallas 1-Wire</button>";
-static const char webBodyRootS0Tab[] PROGMEM =
+static const char webBodyRootS0Tab[] FLASHPROG =
   "<button class='tabnav-btn' data-tab='S0' onclick=\"openTable('S0')\">S0 kWh</button>";
-static const char webBodyRootOpenthermTab[] PROGMEM =
+static const char webBodyRootOpenthermTab[] FLASHPROG =
   "<button class='tabnav-btn' data-tab='Opentherm' onclick=\"openTable('Opentherm')\">Opentherm</button>";
-static const char webTabnavClose[] PROGMEM =
+static const char webTabnavClose[] FLASHPROG =
   "  <button class='tabnav-btn' data-tab='Console' onclick=\"openTable('Console')\">Console</button>"
   "</nav>";
 // These are injected by the server between tabnav wrappers:
-static const char webBodyEndDiv[] PROGMEM = "</div>";
+static const char webBodyEndDiv[] FLASHPROG = "</div>";
 
 // ─── TAB PANES ───
-static const char webBodyRootHeatpumpValues[] PROGMEM =
+static const char webBodyRootHeatpumpValues[] FLASHPROG =
   "<div id='Heatpump' class='tab-pane active'>"
   "<div class='panel'>"
   "  <div class='panel-header'><h3>Heatpump Values</h3><span class='panel-meta' id='hpMeta'>Live</span></div>"
@@ -813,7 +815,7 @@ static const char webBodyRootHeatpumpValues[] PROGMEM =
   "  </tbody></table>"
   "</div></div>";
 
-static const char webBodyRootDallasValues[] PROGMEM =
+static const char webBodyRootDallasValues[] FLASHPROG =
   "<div id='Dallas' class='tab-pane'>"
   "<div class='panel'>"
   "  <div class='panel-header'><h3>Dallas 1-Wire Sensors</h3><span class='panel-meta'>Live</span></div>"
@@ -824,7 +826,7 @@ static const char webBodyRootDallasValues[] PROGMEM =
   "  </tbody></table>"
   "</div></div>";
 
-static const char webBodyRootS0Values[] PROGMEM =
+static const char webBodyRootS0Values[] FLASHPROG =
   "<div id='S0' class='tab-pane'>"
   "<div class='panel'>"
   "  <div class='panel-header'><h3>S0 kWh Meters</h3><span class='panel-meta'>Live</span></div>"
@@ -835,7 +837,7 @@ static const char webBodyRootS0Values[] PROGMEM =
   "  </tbody></table>"
   "</div></div>";
 
-static const char webBodyRootOpenthermValues[] PROGMEM =
+static const char webBodyRootOpenthermValues[] FLASHPROG =
   "<div id='Opentherm' class='tab-pane'>"
   "<div class='panel'>"
   "  <div class='panel-header'><h3>Opentherm Values</h3><span class='panel-meta'>Live</span></div>"
@@ -846,7 +848,7 @@ static const char webBodyRootOpenthermValues[] PROGMEM =
   "  </tbody></table>"
   "</div></div>";
 
-static const char webBodyRootConsole[] PROGMEM =
+static const char webBodyRootConsole[] FLASHPROG =
   "<div id='Console' class='tab-pane'>"
   "<div class='panel'>"
   "  <div class='panel-header'><h3>Console Output</h3><span class='panel-meta'>WebSocket</span></div>"
@@ -861,7 +863,7 @@ static const char webBodyRootConsole[] PROGMEM =
 // ─────────────────────────────────────────────────────────────────────────────
 // SETTINGS PAGE
 // ─────────────────────────────────────────────────────────────────────────────
-static const char settingsJS[] PROGMEM =
+static const char settingsJS[] FLASHPROG =
   "<script>"
   "function ShowHideDallasTable(cb){"
   "  document.getElementById('dallassettings').style.display=cb.checked?'block':'none';"
@@ -876,7 +878,7 @@ static const char settingsJS[] PROGMEM =
   "}"
   "</script>";
 
-static const char webBodySettings1[] PROGMEM =
+static const char webBodySettings1[] FLASHPROG =
   "<script>"
   "document.addEventListener('DOMContentLoaded',function(){"
   "  var nav=document.getElementById('sideNav');"
@@ -891,7 +893,7 @@ static const char webBodySettings1[] PROGMEM =
   "});"
   "</script>";
 
-static const char settingsForm1[] PROGMEM =
+static const char settingsForm1[] FLASHPROG =
   "<div class='main-content' style='max-width:780px;margin:0 auto'>"
   "<div id='loading_settings' class='loading-overlay'>"
   "  <div class='spinner'></div> Loading settings…"
@@ -984,7 +986,7 @@ static const char settingsForm1[] PROGMEM =
 // server inserts tzDataOptions here, then settingsForm2 continues
 
 #ifdef ESP8266
-static const char settingsForm2[] PROGMEM =
+static const char settingsForm2[] FLASHPROG =
   "      </select>"
   "    </div>"
   "  </div></div>"
@@ -1095,7 +1097,7 @@ static const char settingsForm2[] PROGMEM =
 
 #else
 // ESP32 version of settingsForm2
-static const char settingsForm2[] PROGMEM =
+static const char settingsForm2[] FLASHPROG =
   "      </select>"
   "    </div>"
   "  </div></div>"
@@ -1207,7 +1209,7 @@ static const char settingsForm2[] PROGMEM =
 #endif
 
 // Populate settings form via /getsettings (unchanged logic)
-const char populategetsettingsJS[] PROGMEM =
+const char populategetsettingsJS[] FLASHPROG =
   "<script>"
   "var getSettings=function(){"
   "  var req=new XMLHttpRequest();"
@@ -1238,14 +1240,14 @@ const char populategetsettingsJS[] PROGMEM =
   "getSettings();"
   "</script>";
 
-static const char changewifissidJS[] PROGMEM =
+static const char changewifissidJS[] FLASHPROG =
   "<script>"
   "function changewifissid(){"
   "  document.getElementById('wifi_ssid_id').value=document.getElementById('wifi_ssid_select').value;"
   "}"
   "</script>";
 
-static const char populatescanwifiJS[] PROGMEM =
+static const char populatescanwifiJS[] FLASHPROG =
   "<script>"
   "var refreshWifiScan=function(){"
   "  var sel=document.getElementById('wifi_ssid_select');"
@@ -1276,7 +1278,7 @@ static const char populatescanwifiJS[] PROGMEM =
 // ─────────────────────────────────────────────────────────────────────────────
 // RULES PAGE
 // ─────────────────────────────────────────────────────────────────────────────
-static const char showRulesPage1[] PROGMEM =
+static const char showRulesPage1[] FLASHPROG =
   "<script>"
   "document.addEventListener('DOMContentLoaded',function(){"
   "  var nav=document.getElementById('sideNav');"
@@ -1297,7 +1299,7 @@ static const char showRulesPage1[] PROGMEM =
   "      <form accept-charset='UTF-8' action='/saverules' enctype='multipart/form-data' method='POST'>"
   "        <textarea name='rules' class='rules-editor'>";
 
-static const char showRulesPage2[] PROGMEM =
+static const char showRulesPage2[] FLASHPROG =
   "        </textarea>"
   "        <div style='margin-top:12px'>"
   "          <button type='submit' class='btn btn-primary'>Save Rules</button>"
@@ -1310,7 +1312,7 @@ static const char showRulesPage2[] PROGMEM =
 // ─────────────────────────────────────────────────────────────────────────────
 // FIRMWARE PAGE
 // ─────────────────────────────────────────────────────────────────────────────
-static const char showFirmwarePage[] PROGMEM =
+static const char showFirmwarePage[] FLASHPROG =
   "<script>"
   "document.addEventListener('DOMContentLoaded',function(){"
   "  var nav=document.getElementById('sideNav');"
@@ -1373,28 +1375,28 @@ static const char showFirmwarePage[] PROGMEM =
   "  </div>"
   "</div>";
 
-static const char firmwareSuccessResponse[] PROGMEM =
+static const char firmwareSuccessResponse[] FLASHPROG =
   "Update success! Rebooting. This page will refresh afterwards.";
 
-static const char firmwareFailResponse[] PROGMEM =
+static const char firmwareFailResponse[] FLASHPROG =
   "Update failed! Please try again...";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MESSAGE PAGES (reboot, factory reset, wifi change, password error, save ok)
 // ─────────────────────────────────────────────────────────────────────────────
-static const char webBodyFactoryResetWarning[] PROGMEM =
+static const char webBodyFactoryResetWarning[] FLASHPROG =
   "<div class='msg-box danger'>"
   "  <h2>Factory Reset</h2>"
   "  <p>All configuration has been erased.<br>Connect to the <strong style='color:var(--text-primary)'>Heishamon-Setup</strong> WiFi hotspot to reconfigure.</p>"
   "</div>";
 
-static const char webBodyRebootWarning[] PROGMEM =
+static const char webBodyRebootWarning[] FLASHPROG =
   "<div class='msg-box'>"
   "  <h2>Rebooting…</h2>"
   "  <p>The device is restarting. Please wait.</p>"
   "</div>";
 
-static const char webBodySettingsNewWifiWarning[] PROGMEM =
+static const char webBodySettingsNewWifiWarning[] FLASHPROG =
   "<div class='msg-box'>"
   "  <h2>Reconfiguring WiFi</h2>"
   "  <p>Attempting to connect to the new access point.<br><br>"
@@ -1402,14 +1404,14 @@ static const char webBodySettingsNewWifiWarning[] PROGMEM =
   "  This page will redirect to home shortly.</p>"
   "</div>";
 
-static const char webBodySettingsResetPasswordWarning[] PROGMEM =
+static const char webBodySettingsResetPasswordWarning[] FLASHPROG =
   "<div class='msg-box warning'>"
   "  <h2>Wrong Password</h2>"
   "  <p>The current password you entered is incorrect.<br><br>"
   "  Perform a factory reset to restore the default password: <strong style='color:var(--text-primary)'>heisha</strong></p>"
   "</div>";
 
-static const char webBodySettingsSaveMessage[] PROGMEM =
+static const char webBodySettingsSaveMessage[] FLASHPROG =
   "<div class='msg-box success'>"
   "  <h2>Settings Saved</h2>"
   "  <p>Configuration has been saved. The device is rebooting…</p>"
@@ -1423,7 +1425,8 @@ struct tzStruct {
   char name[32];
   char value[46];
 };
-const tzStruct tzdata[] PROGMEM = {
+const tzStruct tzdata[] FLASHPROG = {
+
   { "ETC/GMT", "GMT0" },
   { "Africa/Abidjan", "GMT0" },
   { "Africa/Accra", "GMT0" },
@@ -1888,7 +1891,7 @@ const tzStruct tzdata[] PROGMEM = {
 };
 
 // tzDataOptions unchanged — large option block for <select>
-static const char tzDataOptions[] PROGMEM =
+static const char tzDataOptions[] FLASHPROG =
   "<option value=\"0\">ETC/GMT</option>"
   "<option value=\"1\">Africa/Abidjan</option>"
   "<option value=\"2\">Africa/Accra</option>"
