@@ -359,7 +359,7 @@ void check_wifi() {
   // Retry STA connection
   if (heishamonSettings.wifi_ssid[0] != '\0') {
     // Repair STA if it is stopped
-    if !(WiFi.getMode() & WIFI_MODE_STA) {
+    if (!(WiFi.getMode() & WIFI_MODE_STA)) {
       log_message(_F("STA stopped, re-enabling STA"));
       WiFi.mode(WIFI_AP_STA);
       delay(50);
