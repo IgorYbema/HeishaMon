@@ -175,10 +175,8 @@ void check_wifi() {
   int wifistatus = WiFi.status();
   if ((wifistatus != WL_CONNECTED) && (WiFi.localIP())) {
     // special case where it seems that we are not connect but we do have working IP (causing the -1% wifi signal), do a reset.
-#ifdef ESP8266
     log_message(_F("Weird case, WiFi seems disconnected but is not. Resetting WiFi!"));
     setupWifi(&heishamonSettings);
-#endif
   } else if ((wifistatus != WL_CONNECTED) || (!WiFi.localIP())) {
     /*
         if we are not connected to an AP
@@ -263,10 +261,8 @@ void check_wifi() {
     WiFi.scanNetworksAsync(getWifiScanResults);
   }
 }
-
 #elif defined(ESP32)
 void check_wifi() {
-
   wl_status_t wifistatus = WiFi.status();
   bool ethUp = ETH.hasIP();
   bool wifiUp = (wifistatus == WL_CONNECTED);
@@ -284,6 +280,14 @@ void check_wifi() {
       log_message(_F("WiFi or ETH connected, shutting down hotspot"));
       WiFi.softAPdisconnect(true);
       WiFi.mode(WIFI_STA);
+      if (wifistatus != WL_CONNECTED) { //it must be that ETH reconnected, so keep trying WiFi in the background
+        WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+        if (heishamonSettings.wifi_password[0] == '\0') {
+          WiFi.begin(heishamonSettings.wifi_ssid);
+        } else {
+          WiFi.begin(heishamonSettings.wifi_ssid, heishamonSettings.wifi_password);
+        }
+      }
     }
 
     if (firstConnectSinceBoot) {
@@ -322,10 +326,12 @@ void check_wifi() {
 
   // If AP client is connected, STA must back off
   if (WiFi.softAPgetStationNum() > 0) {
-    log_message(_F("SoftAP client active, suspending STA reconnect"));
-	WiFi.disconnect(true);
-	WiFi.mode(WIFI_AP);
-	return;
+    if (WiFi.getMode() != WIFI_AP) {
+      log_message(_F("SoftAP client active, suspending STA reconnect"));
+	    WiFi.disconnect(true);
+	    WiFi.mode(WIFI_AP);
+    }
+	  return; //always return if hotspot is used
   }
 
   // Periodic retry gate
@@ -342,25 +348,28 @@ void check_wifi() {
     WiFi.softAP(_F("HeishaMon-Setup"));
   }
 
-  // Repair STA if it is stopped
-  if (wifistatus == WL_STOPPED) {
-    log_message(_F("STA stopped, re-enabling STA"));
-    WiFi.mode(WIFI_AP_STA);
-    delay(50);
+  // Disable STA so next retry is clean and we wait WIFIRETRYTIMER so hotspot can do its thing
+  if (WiFi.getMode() != WIFI_AP) {
+    log_message(_F("Disabling WiFi STA for a while..."));	
+	  WiFi.disconnect(true);
+    WiFi.mode(WIFI_AP); 
+    return;
   }
 
   // Retry STA connection
   if (heishamonSettings.wifi_ssid[0] != '\0') {
+    // Repair STA if it is stopped
+    if !(WiFi.getMode() & WIFI_MODE_STA) {
+      log_message(_F("STA stopped, re-enabling STA"));
+      WiFi.mode(WIFI_AP_STA);
+      delay(50);
+    }    
     log_message(_F("Retrying configured WiFi"));
-	WiFi.disconnect(false); 
-	delay(50);
     WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
-	
     if (heishamonSettings.wifi_password[0] == '\0') {
       WiFi.begin(heishamonSettings.wifi_ssid);
     } else {
-      WiFi.begin(heishamonSettings.wifi_ssid,
-                 heishamonSettings.wifi_password);
+      WiFi.begin(heishamonSettings.wifi_ssid, heishamonSettings.wifi_password);
     }
   }
 }
