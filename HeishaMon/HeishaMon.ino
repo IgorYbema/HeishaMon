@@ -1820,7 +1820,6 @@ void loop() {
         if (ETH.hasIP()) {
           ethernetStat = F("connected - IP: ");
           ethernetStat += ETH.localIP().toString();
-          ethernetStat += F(")");
         } else {
           ethernetStat = F("connected - no IP");
         }
