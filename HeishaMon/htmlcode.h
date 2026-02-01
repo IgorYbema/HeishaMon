@@ -750,7 +750,7 @@ static const char webBodyRoot2[] FLASHPROG =
   // status bar
   "<div class='main-content'>"
   "<div class='statusbar' id='statusBar'>"
-  "  <div class='status-chip'><span class='status-dot'></span><span class='chip-label'>WiFi</span><span class='chip-value' id='wifi'>—</span></div>"
+  "  <div class='status-chip'><span class='status-dot'></span><span class='chip-label'>WiFi</span><span class='chip-value' id='wifi'>—</span></div><span style='color:var(--text-muted);font-size:11px'>%</span></div>"
 #ifdef ESP8266
   "  <div class='status-chip'><span class='chip-label'>Memory</span><span class='chip-value' id='memory'>—</span><span style='color:var(--text-muted);font-size:11px'>%</span></div>"
 #else
@@ -772,9 +772,6 @@ static const char webBodyRootStatusListenOnly[] FLASHPROG =
   "  bar.appendChild(chip);"
   "});</script>";
 
-// The server still inserts live values between these fragments in sequence:
-//   print(Wifi) -> print(wifiVal) -> print(Memory) -> print(memVal) -> ... -> print(EndSpan)
-// Wrap as HTML comment boundaries so injected values are invisible:
 static const char webBodyRootStatusWifi[] FLASHPROG = "<!--";
 #ifdef ESP8266
 static const char webBodyRootStatusMemory[] FLASHPROG = "--><!--";
