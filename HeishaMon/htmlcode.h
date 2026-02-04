@@ -400,21 +400,26 @@ static const char webCSS[] FLASHPROG =
   "}"
 
   /* ── RULES PAGE ── */
-  ".rules-container{max-width:820px;margin:0 auto;padding:32px 24px}"
-  "textarea.rules-editor{"
-  "  width:100%;"
-  "  min-height:340px;"
-  "  background:#0a0c0f;"
-  "  color:#c3dafe;"
-  "  border:1px solid var(--border);"
-  "  border-radius:var(--radius);"
-  "  padding:16px;"
-  "  font-family:'JetBrains Mono',monospace;"
-  "  font-size:12px;"
-  "  line-height:1.7;"
-  "  resize:vertical;outline:none;"
-  "}"
-  "textarea.rules-editor:focus{border-color:var(--border-focus);box-shadow:0 0 0 3px var(--accent-glow)}"
+".rules-editor{background:#0f1117;color:#e4e7eb;padding:12px;border:1px solid #2d3748;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:14px;line-height:1.5;min-height:400px;white-space:pre;overflow:auto;}"
+".rules-editor:focus{outline:none;border-color:#3a7bd5;}"
+".keyword{color:#c792ea;}"
+".operator{color:#89ddff;}"
+".number{color:#f78c6c;}"
+".string{color:#c3e88d;}"
+".comment{color:#546e7a;font-style:italic;}"
+".variable{color:#82aaff;}"
+".function{color:#ffcb6b;}"
+".at-param{color:#f07178;}"
+".percent-param{color:#c3e88d;}"
+".question-param{color:#89ddff;}"
+".ds18b20{color:#ff5370;}"
+".rules-error{border:2px solid #e74c5e!important;box-shadow:0 0 0 3px rgba(231,76,94,0.2)!important;}"
+".rules-valid{border:2px solid #2ecc94!important;box-shadow:0 0 0 3px rgba(46,204,148,0.2)!important;}"
+".validation-feedback{margin-top:8px;padding:10px 14px;border-radius:6px;font-size:13px;line-height:1.4;}"
+".validation-feedback.error{background:rgba(231,76,94,0.1);border:1px solid #e74c5e;color:#ff9999;}"
+".validation-feedback.success{background:rgba(46,204,148,0.1);border:1px solid #2ecc94;color:#6ee7b7;}"
+".validation-feedback.warning{background:rgba(240,165,0,0.1);border:1px solid #f0a500;color:#ffd54f;}"
+
 
   /* ── MESSAGES ── */
   ".msg-box{"
@@ -1311,10 +1316,15 @@ static const char showRulesPage1[] FLASHPROG =
   "    <div class='panel-header'><h3>Rules Editor</h3><span class='panel-meta'>Saved to flash</span></div>"
   "    <div style='padding:16px'>"
   "      <form accept-charset='UTF-8' action='/saverules' enctype='multipart/form-data' method='POST'>"
-  "        <textarea name='rules' class='rules-editor'>";
+"  <div id='rules' contenteditable='true' spellcheck='false' class='rules-editor'></div>"
+"  <div style='margin-top:12px;'>"
+"    <button type='button' onclick='validateRules()' style='background:#3a7bd5;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;margin-right:8px;'>Validate</button>"
+"    <button type='button' onclick='saveRules()' style='background:#2ecc94;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;'>Save Rules</button>"
+"  </div>"
+"  <div id='validation-result'></div>";
+
 
 static const char showRulesPage2[] FLASHPROG =
-  "        </textarea>"
   "        <div style='margin-top:12px'>"
   "          <button type='submit' class='btn btn-primary'>Save Rules</button>"
   "        </div>"
@@ -1322,6 +1332,293 @@ static const char showRulesPage2[] FLASHPROG =
   "    </div>"
   "  </div>"
   "</div>";
+
+static const char rulesJS[] FLASHPROG = R"=====(
+<script>
+const KEYWORDS = ['on','then','end','if','else','elseif','NULL'];
+const OPERATORS = ['&&','||','==','>=','<=','!=','>','<','+','-','*','/','%','^','='];
+const FUNCTIONS = ['coalesce','max','min','isset','round','floor','ceil','setTimer','print','concat','gpio'];
+
+function highlightRules() {
+  const editor = document.getElementById('rules');
+  const cursorPos = saveCursorPosition(editor);
+  
+  let text = editor.textContent;
+  let html = '';
+  let i = 0;
+  
+  while(i < text.length) {
+    let matched = false;
+    
+    // Comments
+    if(text.substr(i,2) === '//') {
+      let end = text.indexOf('\n', i);
+      if(end === -1) end = text.length;
+      html += '<span class="comment">' + escapeHtml(text.substring(i,end)) + '</span>';
+      i = end;
+      matched = true;
+    }
+    
+    // Strings
+    if(!matched && (text[i] === "'" || text[i] === '"')) {
+      const quote = text[i];
+      let end = i + 1;
+      while(end < text.length && text[end] !== quote) {
+        if(text[end] === '\\') end++;
+        end++;
+      }
+      if(end < text.length) end++;
+      html += '<span class="string">' + escapeHtml(text.substring(i,end)) + '</span>';
+      i = end;
+      matched = true;
+    }
+    
+    // Numbers
+    if(!matched && /\d/.test(text[i])) {
+      let end = i;
+      while(end < text.length && /[\d.]/.test(text[end])) end++;
+      html += '<span class="number">' + text.substring(i,end) + '</span>';
+      i = end;
+      matched = true;
+    }
+    
+    // Keywords
+    if(!matched && /[a-zA-Z]/.test(text[i])) {
+      for(let k of KEYWORDS) {
+        if(text.substr(i,k.length) === k && (i===0 || !/\w/.test(text[i-1])) && (i+k.length>=text.length || !/\w/.test(text[i+k.length]))) {
+          html += '<span class="keyword">' + k + '</span>';
+          i += k.length;
+          matched = true;
+          break;
+        }
+      }
+    }
+    
+    // Functions
+    if(!matched && /[a-zA-Z]/.test(text[i])) {
+      for(let f of FUNCTIONS) {
+        if(text.substr(i,f.length+1) === f+'(' && (i===0 || !/\w/.test(text[i-1]))) {
+          html += '<span class="function">' + f + '</span>(';
+          i += f.length + 1;
+          matched = true;
+          break;
+        }
+      }
+    }
+    
+    // Heatpump params (@)
+    if(!matched && text[i] === '@') {
+      let end = i + 1;
+      while(end < text.length && /\w/.test(text[end])) end++;
+      html += '<span class="at-param">' + text.substring(i,end) + '</span>';
+      i = end;
+      matched = true;
+    }
+    
+    // DateTime params (%)
+    if(!matched && text[i] === '%') {
+      let end = i + 1;
+      while(end < text.length && /\w/.test(text[end])) end++;
+      html += '<span class="percent-param">' + text.substring(i,end) + '</span>';
+      i = end;
+      matched = true;
+    }
+    
+    // Thermostat params (?)
+    if(!matched && text[i] === '?') {
+      let end = i + 1;
+      while(end < text.length && /\w/.test(text[end])) end++;
+      html += '<span class="question-param">' + text.substring(i,end) + '</span>';
+      i = end;
+      matched = true;
+    }
+    
+    // Dallas sensors
+    if(!matched && text.substr(i,8) === 'ds18b20#') {
+      let end = i + 8;
+      while(end < text.length && /[0-9A-Fa-f]/.test(text[end])) end++;
+      html += '<span class="ds18b20">' + text.substring(i,end) + '</span>';
+      i = end;
+      matched = true;
+    }
+    
+    // Variables (# and $)
+    if(!matched && (text[i] === '#' || text[i] === '$')) {
+      let end = i + 1;
+      while(end < text.length && /\w/.test(text[end])) end++;
+      html += '<span class="variable">' + text.substring(i,end) + '</span>';
+      i = end;
+      matched = true;
+    }
+    
+    // Operators (check longer ones first)
+    if(!matched) {
+      const sortedOps = OPERATORS.slice().sort((a,b) => b.length - a.length);
+      for(let o of sortedOps) {
+        if(text.substr(i,o.length) === o) {
+          html += '<span class="operator">' + escapeHtml(o) + '</span>';
+          i += o.length;
+          matched = true;
+          break;
+        }
+      }
+    }
+    
+    // Default character
+    if(!matched) {
+      html += escapeHtml(text[i]);
+      i++;
+    }
+  }
+  
+  editor.innerHTML = html;
+  restoreCursorPosition(editor, cursorPos);
+}
+
+function escapeHtml(text) {
+  return text.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+}
+
+function saveCursorPosition(el) {
+  const sel = window.getSelection();
+  if(sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+  const preCaretRange = range.cloneRange();
+  preCaretRange.selectNodeContents(el);
+  preCaretRange.setEnd(range.endContainer, range.endOffset);
+  return preCaretRange.toString().length;
+}
+
+function restoreCursorPosition(el, pos) {
+  if(pos === null) return;
+  const sel = window.getSelection();
+  let charCount = 0;
+  const nodeStack = [el];
+  let node, foundStart = false;
+  const range = document.createRange();
+  range.setStart(el, 0);
+  range.collapse(true);
+  
+  while(!foundStart && (node = nodeStack.pop())) {
+    if(node.nodeType === 3) {
+      const nextCharCount = charCount + node.length;
+      if(pos <= nextCharCount) {
+        range.setStart(node, pos - charCount);
+        foundStart = true;
+      }
+      charCount = nextCharCount;
+    } else {
+      let i = node.childNodes.length;
+      while(i--) {
+        nodeStack.push(node.childNodes[i]);
+      }
+    }
+  }
+  
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
+function validateRules() {
+  const editor = document.getElementById('rules');
+  const result = document.getElementById('validation-result');
+  const code = editor.textContent.trim();
+  
+  if(!code) {
+    result.innerHTML = '<div class="validation-feedback warning">Rules are empty.</div>';
+    return;
+  }
+  
+  const errors = [];
+  const warnings = [];
+  let inBlock = false;
+  let blockStack = [];
+  
+  const lines = code.split('\n');
+  for(let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if(!line || line.startsWith('//')) continue;
+    
+    if(line.startsWith('on ')) {
+      if(inBlock) errors.push('Line ' + (i+1) + ': Missing "end" before new "on" block');
+      blockStack.push('on');
+      inBlock = true;
+    }
+    
+    if(line === 'end') {
+      if(!inBlock) errors.push('Line ' + (i+1) + ': "end" without matching "on"');
+      else {
+        blockStack.pop();
+        if(blockStack.length === 0) inBlock = false;
+      }
+    }
+    
+    if(line.startsWith('if ')) blockStack.push('if');
+    
+    if(line === 'else' || line.startsWith('elseif ')) {
+      if(blockStack[blockStack.length-1] !== 'if') {
+        errors.push('Line ' + (i+1) + ': "else/elseif" without matching "if"');
+      }
+    }
+    
+    if(!line.endsWith(';') && !line.endsWith('then') && line !== 'end' && 
+       !line.startsWith('on ') && !line.startsWith('if ') && 
+       line !== 'else' && !line.startsWith('elseif ')) {
+      warnings.push('Line ' + (i+1) + ': Missing semicolon');
+    }
+  }
+  
+  if(inBlock || blockStack.length > 0) {
+    errors.push('Unclosed block(s): ' + blockStack.join(', '));
+  }
+  
+  const onMatches = code.match(/\bon\s+/g);
+  const endMatches = code.match(/\bend\b/g);
+  const onCount = (onMatches || []).length;
+  const endCount = (endMatches || []).length;
+  
+  if(onCount !== endCount) {
+    errors.push('Mismatch: ' + onCount + ' "on" blocks but ' + endCount + ' "end" statements');
+  }
+  
+  editor.classList.remove('rules-error', 'rules-valid');
+  
+  if(errors.length > 0) {
+    editor.classList.add('rules-error');
+    result.innerHTML = '<div class="validation-feedback error"><strong>Errors:</strong><br>' + errors.join('<br>') + '</div>';
+  } else if(warnings.length > 0) {
+    editor.classList.add('rules-valid');
+    result.innerHTML = '<div class="validation-feedback warning"><strong>Warnings:</strong><br>' + warnings.join('<br>') + '</div>';
+  } else {
+    editor.classList.add('rules-valid');
+    result.innerHTML = '<div class="validation-feedback success"><strong>✓ Rules are valid!</strong><br>No syntax errors detected.</div>';
+  }
+}
+
+function saveRules() {
+  const editor = document.getElementById('rules');
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/rules';
+  
+  const input = document.createElement('textarea');
+  input.name = 'rules';
+  input.value = editor.textContent;
+  form.appendChild(input);
+  
+  document.body.appendChild(form);
+  form.submit();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const editor = document.getElementById('rules');
+  if(editor) {
+    editor.addEventListener('input', highlightRules);
+    highlightRules();
+  }
+});
+</script>
+)=====";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FIRMWARE PAGE

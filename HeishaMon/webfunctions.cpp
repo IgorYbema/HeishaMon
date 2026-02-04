@@ -1338,6 +1338,7 @@ int showRules(struct webserver_t *client) {
           }
           client->userdata = NULL;
           webserver_send_content_P(client, showRulesPage2, strlen_P(showRulesPage2));
+          webserver_send_content_P(client, rulesJS, strlen_P(rulesJS));
           webserver_send_content_P(client, menuJS, strlen_P(menuJS));
           webserver_send_content_P(client, webFooter, strlen_P(webFooter));
         }
@@ -1350,6 +1351,7 @@ int showRules(struct webserver_t *client) {
         }
         client->userdata = NULL;
         webserver_send_content_P(client, showRulesPage2, strlen_P(showRulesPage2));
+        webserver_send_content_P(client, rulesJS, strlen_P(rulesJS));
         webserver_send_content_P(client, menuJS, strlen_P(menuJS));
         webserver_send_content_P(client, webFooter, strlen_P(webFooter));
       }
@@ -1362,11 +1364,13 @@ int showRules(struct webserver_t *client) {
       }
       client->userdata = NULL;
       webserver_send_content_P(client, showRulesPage2, strlen_P(showRulesPage2));
+      webserver_send_content_P(client, rulesJS, strlen_P(rulesJS));
       webserver_send_content_P(client, menuJS, strlen_P(menuJS));
       webserver_send_content_P(client, webFooter, strlen_P(webFooter));
     }
   } else if (client->content == 1) {
     webserver_send_content_P(client, showRulesPage2, strlen_P(showRulesPage2));
+    webserver_send_content_P(client, rulesJS, strlen_P(rulesJS));
     webserver_send_content_P(client, menuJS, strlen_P(menuJS));
     webserver_send_content_P(client, webFooter, strlen_P(webFooter));
   }
