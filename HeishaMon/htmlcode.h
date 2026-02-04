@@ -172,8 +172,12 @@ static const char webCSS[] FLASHPROG =
   ".status-chip .chip-value{color:var(--text-primary);font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500}"
   ".status-chip.listen-only{border-color:var(--orange);background:rgba(240,165,0,.08)}"
   ".status-chip.listen-only .chip-value{color:var(--orange)}"
-  ".status-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green-glow)}"
-  ".status-dot.warn{background:var(--orange);box-shadow:0 0 6px rgba(240,165,0,.3)}"
+  ".status-dot{width:8px;height:8px;border-radius:50%;margin-right:8px;transition:background 0.3s;}"
+  ".status-dot.excellent{background:#2ecc94;}"
+  ".status-dot.good{background:#3a7bd5;}"
+  ".status-dot.fair{background:#f0a500;}"
+  ".status-dot.poor{background:#e74c5e;}"
+  ".status-dot.disconnected{background:#6b7280;}"
 
   /* ── DATA TABLE ── */
   ".panel{"
@@ -586,6 +590,19 @@ static const char websocketJS[] FLASHPROG =
   "function updStat(id,val){"
   "  var el=document.getElementById(id);"
   "  if(el)el.textContent=val!=null?val:'';"
+  "  if ((el) && (id == 'wifi') && (val!==undefined)){"
+  "    var w=parseInt(val);"
+  "    var label=el.previousElementSibling;"
+  "    var dot=label.previousElementSibling;"
+  "    if(dot&&dot.classList.contains('status-dot')){"
+  "      dot.className='status-dot';"
+  "      if(w===-1||w<0)dot.classList.add('disconnected');"
+  "      else if(w>=75)dot.classList.add('excellent');"
+  "      else if(w>=50)dot.classList.add('good');"
+  "      else if(w>=25)dot.classList.add('fair');"
+  "      else dot.classList.add('poor');"
+  "    }"
+  "  }"  
   "}"
   "function updCell(id,val){"
   "  var el=document.getElementById(id);"
@@ -750,7 +767,7 @@ static const char webBodyRoot2[] FLASHPROG =
   // status bar
   "<div class='main-content'>"
   "<div class='statusbar' id='statusBar'>"
-  "  <div class='status-chip'><span class='status-dot'></span><span class='chip-label'>WiFi</span><span class='chip-value' id='wifi'>—</span></div><span style='color:var(--text-muted);font-size:11px'>%</span></div>"
+  "  <div class='status-chip'><span class='status-dot'></span><span class='chip-label'>WiFi</span><span class='chip-value' id='wifi'>—</span><span style='color:var(--text-muted);font-size:11px'>%</span></div>"
 #ifdef ESP8266
   "  <div class='status-chip'><span class='chip-label'>Memory</span><span class='chip-value' id='memory'>—</span><span style='color:var(--text-muted);font-size:11px'>%</span></div>"
 #else
