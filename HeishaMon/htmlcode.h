@@ -1531,8 +1531,7 @@ function validateRules() {
   
   const errors = [];
   const warnings = [];
-  let inBlock = false;
-  let blockStack = [];
+  const blockStack = [];
   
   const lines = code.split('\n');
   for(let i = 0; i < lines.length; i++) {
@@ -1540,45 +1539,42 @@ function validateRules() {
     if(!line || line.startsWith('//')) continue;
     
     if(line.startsWith('on ')) {
-      if(inBlock) errors.push('Line ' + (i+1) + ': Missing "end" before new "on" block');
-      blockStack.push('on');
-      inBlock = true;
+      blockStack.push({type: 'on', line: i+1});
     }
-    
-    if(line === 'end') {
-      if(!inBlock) errors.push('Line ' + (i+1) + ': "end" without matching "on"');
-      else {
+    else if(line.startsWith('if ')) {
+      blockStack.push({type: 'if', line: i+1, hasElse: false});
+    }
+    else if(line.startsWith('elseif ')) {
+      if(blockStack.length === 0 || blockStack[blockStack.length-1].type !== 'if') {
+        errors.push('Line ' + (i+1) + ': "elseif" without matching "if"');
+      } else if(blockStack[blockStack.length-1].hasElse) {
+        errors.push('Line ' + (i+1) + ': "elseif" after "else"');
+      }
+    }
+    else if(line === 'else') {
+      if(blockStack.length === 0 || blockStack[blockStack.length-1].type !== 'if') {
+        errors.push('Line ' + (i+1) + ': "else" without matching "if"');
+      } else if(blockStack[blockStack.length-1].hasElse) {
+        errors.push('Line ' + (i+1) + ': Multiple "else" for same "if"');
+      } else {
+        blockStack[blockStack.length-1].hasElse = true;
+      }
+    }
+    else if(line === 'end') {
+      if(blockStack.length === 0) {
+        errors.push('Line ' + (i+1) + ': "end" without matching block');
+      } else {
         blockStack.pop();
-        if(blockStack.length === 0) inBlock = false;
       }
     }
-    
-    if(line.startsWith('if ')) blockStack.push('if');
-    
-    if(line === 'else' || line.startsWith('elseif ')) {
-      if(blockStack[blockStack.length-1] !== 'if') {
-        errors.push('Line ' + (i+1) + ': "else/elseif" without matching "if"');
-      }
-    }
-    
-    if(!line.endsWith(';') && !line.endsWith('then') && line !== 'end' && 
-       !line.startsWith('on ') && !line.startsWith('if ') && 
-       line !== 'else' && !line.startsWith('elseif ')) {
+    else if(!line.endsWith(';') && !line.endsWith('then')) {
       warnings.push('Line ' + (i+1) + ': Missing semicolon');
     }
   }
   
-  if(inBlock || blockStack.length > 0) {
-    errors.push('Unclosed block(s): ' + blockStack.join(', '));
-  }
-  
-  const onMatches = code.match(/\bon\s+/g);
-  const endMatches = code.match(/\bend\b/g);
-  const onCount = (onMatches || []).length;
-  const endCount = (endMatches || []).length;
-  
-  if(onCount !== endCount) {
-    errors.push('Mismatch: ' + onCount + ' "on" blocks but ' + endCount + ' "end" statements');
+  if(blockStack.length > 0) {
+    const unclosed = blockStack.map(b => b.type + ' (line ' + b.line + ')');
+    errors.push('Unclosed block(s): ' + unclosed.join(', '));
   }
   
   editor.classList.remove('rules-error', 'rules-valid');
@@ -1613,10 +1609,76 @@ function saveRules() {
 document.addEventListener('DOMContentLoaded', function() {
   const editor = document.getElementById('rules');
   if(editor) {
+    editor.addEventListener('keydown', function(e) {
+      if(e.key === 'Enter') {
+        e.preventDefault();
+        const sel = window.getSelection();
+        const range = sel.getRangeAt(0);
+        const lines = editor.textContent.substring(0, getCursorPosition()).split('\n');
+        const currentLine = lines[lines.length - 1];
+        const indentMatch = currentLine.match(/^[\t ]*/);
+        let indent = indentMatch ? indentMatch[0] : '';
+        const trimmedLine = currentLine.trim();
+        if(trimmedLine.endsWith('then')) {
+          indent += '\t';
+        }
+        range.deleteContents();
+        const textNode = document.createTextNode('\n' + indent);
+        range.insertNode(textNode);
+        range.setStartAfter(textNode);
+        range.setEndAfter(textNode);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        highlightRules();
+      }
+      if(e.key === 'Tab') {
+        e.preventDefault();
+        const sel = window.getSelection();
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        const textNode = document.createTextNode('\t');
+        range.insertNode(textNode);
+        range.setStartAfter(textNode);
+        range.setEndAfter(textNode);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        highlightRules();
+      }
+      if(e.key === 'Backspace') {
+        const sel = window.getSelection();
+        if(sel.rangeCount === 0) return;
+        const range = sel.getRangeAt(0);
+        const textBeforeCursor = editor.textContent.substring(0, getCursorPosition());
+        const lines = textBeforeCursor.split('\n');
+        const currentLine = lines[lines.length - 1];
+        if(currentLine.match(/^[\t ]+$/) && range.collapsed) {
+          e.preventDefault();
+          const newIndent = currentLine.substring(0, currentLine.length - 1);
+          const lineStart = textBeforeCursor.length - currentLine.length;
+          const beforeLine = editor.textContent.substring(0, lineStart);
+          const afterLine = editor.textContent.substring(textBeforeCursor.length);
+          editor.textContent = beforeLine + newIndent + afterLine;
+          restoreCursorPosition(editor, lineStart + newIndent.length);
+          highlightRules();
+        }
+      }
+    });
+    
     editor.addEventListener('input', highlightRules);
     highlightRules();
   }
 });
+
+function getCursorPosition() {
+  const sel = window.getSelection();
+  if(sel.rangeCount === 0) return 0;
+  const range = sel.getRangeAt(0);
+  const preCaretRange = range.cloneRange();
+  preCaretRange.selectNodeContents(document.getElementById('rules'));
+  preCaretRange.setEnd(range.endContainer, range.endOffset);
+  return preCaretRange.toString().length;
+}
+
 </script>
 )=====";
 
