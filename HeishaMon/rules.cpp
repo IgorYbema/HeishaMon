@@ -73,7 +73,7 @@ typedef struct varstack_t {
 static struct varstack_t global_varstack = { .array = NULL, .nr = 0 };
 
 #if defined(ESP8266)
-unsigned char *mempool = (unsigned char *)MEMPOOL_ADDRESS;
+unsigned char *mempool = (unsigned char *)MMU_SEC_HEAP;
 #elif defined(ESP32)
 unsigned char *mempool; //malloc in runtime
 #endif
@@ -382,14 +382,14 @@ static int8_t check_is_number(const char *str) {
 static int8_t vm_value_get(struct rules_t *obj) {
   int16_t x = 0;
 
-  if(rules_gettop(obj) < 1) {
+  if(rules_gettop() < 1) {
     return -1;
   }
-  if(rules_type(obj, -1) != VCHAR) {
+  if(rules_type(-1) != VCHAR) {
     return -1;
   }
 
-  const char *key = rules_tostring(obj, -1);
+  const char *key = rules_tostring(-1);
 
   if(key[0] == '?') {
     int x = 0;
@@ -397,11 +397,11 @@ static int8_t vm_value_get(struct rules_t *obj) {
       if(heishaOTDataStruct[x].rw >= 2 &&
          stricmp((char *)&key[1], heishaOTDataStruct[x].name) == 0) {
         if(heishaOTDataStruct[x].type == TBOOL) {
-          rules_pushinteger(obj, (int)heishaOTDataStruct[x].value.b);
+          rules_pushinteger((int)heishaOTDataStruct[x].value.b);
           return 0;
         }
         if(heishaOTDataStruct[x].type == TFLOAT) {
-          rules_pushfloat(obj, heishaOTDataStruct[x].value.f);
+          rules_pushfloat(heishaOTDataStruct[x].value.f);
           return 0;
         }
         break;
@@ -413,27 +413,27 @@ static int8_t vm_value_get(struct rules_t *obj) {
     time_t now = time(NULL);
     struct tm *tm_struct = localtime(&now);
     if(stricmp((char *)&key[1], "hour") == 0) {
-      rules_pushinteger(obj, (int)tm_struct->tm_hour);
+      rules_pushinteger((int)tm_struct->tm_hour);
       return 0;
     } else if(stricmp((char *)&key[1], "minute") == 0) {
-      rules_pushinteger(obj, (int)tm_struct->tm_min);
+      rules_pushinteger((int)tm_struct->tm_min);
       return 0;
     } else if(stricmp((char *)&key[1], "month") == 0) {
-      rules_pushinteger(obj, (int)tm_struct->tm_mon);
+      rules_pushinteger((int)tm_struct->tm_mon);
       return 0;
     } else if(stricmp((char *)&key[1], "day") == 0) {
-      rules_pushinteger(obj, (int)tm_struct->tm_wday+1);
+      rules_pushinteger((int)tm_struct->tm_wday+1);
       return 0;
     }
   } else if(strnicmp((const char *)key, _F("ds18b20#"), 8) == 0) {
     uint8_t i = 0;
     for(i=0;i<dallasDevicecount;i++) {
       if(strncmp(actDallasData[i].address, (const char *)&key[8], 16) == 0) {
-        rules_pushfloat(obj, actDallasData[i].temperature);
+        rules_pushfloat(actDallasData[i].temperature);
         return 0;
       }
     }
-    rules_pushnil(obj);
+    rules_pushnil();
     return 0;
   } else if(key[0] == '@') {
     uint16_t i = 0;
@@ -444,20 +444,20 @@ static int8_t vm_value_get(struct rules_t *obj) {
         String dataValue = actData[0] == '\0' ? "" : getDataValue(actData, i);
         char *str = (char *)dataValue.c_str();
         if(strlen(str) == 0) {
-          rules_pushnil(obj);
+          rules_pushnil();
         } else if(check_is_number(str) == 0) {
           float var = atof(str);
           float nr = 0;
 
           if(modff(var, &nr) == 0) {
-            rules_pushinteger(obj, (int)var);
+            rules_pushinteger((int)var);
             return 0;
           } else {
-            rules_pushfloat(obj, var);
+            rules_pushfloat(var);
             return 0;
           }
         } else {
-          rules_pushstring(obj, str);
+          rules_pushstring(str);
         }
       }
     }
@@ -468,20 +468,20 @@ static int8_t vm_value_get(struct rules_t *obj) {
         String dataValue = actOptData[0] == '\0' ? "" : getOptDataValue(actOptData, i);
         char *str = (char *)dataValue.c_str();
         if(strlen(str) == 0) {
-          rules_pushnil(obj);
+          rules_pushnil();
         } else if(check_is_number(str) == 0) {
           float var = atof(str);
           float nr = 0;
 
           if(modff(var, &nr) == 0) {
-            rules_pushinteger(obj, (int)var);
+            rules_pushinteger((int)var);
             return 0;
           } else {
-            rules_pushfloat(obj, var);
+            rules_pushfloat(var);
             return 0;
           }
         } else {
-          rules_pushstring(obj, str);
+          rules_pushstring(str);
         }
       }
     }
@@ -492,20 +492,20 @@ static int8_t vm_value_get(struct rules_t *obj) {
         String dataValue = actDataExtra[0] == '\0' ? "" : getDataValueExtra(actDataExtra, i);
         char *str = (char *)dataValue.c_str();
         if(strlen(str) == 0) {
-          rules_pushnil(obj);
+          rules_pushnil();
         } else if(check_is_number(str) == 0) {
           float var = atof(str);
           float nr = 0;
 
           if(modff(var, &nr) == 0) {
-            rules_pushinteger(obj, (int)var);
+            rules_pushinteger((int)var);
             return 0;
           } else {
-            rules_pushfloat(obj, var);
+            rules_pushfloat(var);
             return 0;
           }
         } else {
-          rules_pushstring(obj, str);
+          rules_pushstring(str);
         }
       }
     }
@@ -518,7 +518,7 @@ static int8_t vm_value_get(struct rules_t *obj) {
       table = &global_varstack;
     }
     if(table == NULL) {
-      rules_pushnil(obj);
+      rules_pushnil();
     } else {
       for(x=0;x<table->nr;x++) {
         if(strcmp(table->array[x].key, key) == 0) {
@@ -527,20 +527,20 @@ static int8_t vm_value_get(struct rules_t *obj) {
         }
       }
       if(array == NULL) {
-        rules_pushnil(obj);
+        rules_pushnil();
       } else {
         switch(array->type) {
           case VINTEGER: {
-            rules_pushinteger(obj, array->val.i);
+            rules_pushinteger(array->val.i);
           } break;
           case VFLOAT: {
-            rules_pushfloat(obj, array->val.f);
+            rules_pushfloat(array->val.f);
           } break;
           case VCHAR: {
-            rules_pushstring(obj, (char *)array->val.s);
+            rules_pushstring((char *)array->val.s);
           } break;
           case VNULL: {
-            rules_pushnil(obj);
+            rules_pushnil();
           } break;
         }
       }
@@ -555,17 +555,17 @@ static int8_t vm_value_set(struct rules_t *obj) {
   uint16_t x = 0;
   uint8_t type = 0;
 
-  if(rules_gettop(obj) < 2) {
+  if(rules_gettop() < 2) {
     return -1;
   }
-  type = rules_type(obj, -1);
+  type = rules_type(-1);
 
-  if(rules_type(obj, -2) != VCHAR
+  if(rules_type(-2) != VCHAR
     || (type != VINTEGER && type != VFLOAT && type != VNULL && type != VCHAR)) {
     return -1;
   }
 
-  const char *key = rules_tostring(obj, -2);
+  const char *key = rules_tostring(-2);
 
   if(key[0] == '@') {
     char *payload = NULL;
@@ -573,14 +573,14 @@ static int8_t vm_value_set(struct rules_t *obj) {
 
     switch(type) {
       case VCHAR: {
-        len = snprintf_P(NULL, 0, PSTR("%s"), rules_tostring(obj, -1));
+        len = snprintf_P(NULL, 0, PSTR("%s"), rules_tostring(-1));
         if((payload = (char *)MALLOC(len+1)) == NULL) {
           OUT_OF_MEMORY
         }
-        snprintf_P(payload, len+1, PSTR("%s"), rules_tostring(obj, -1));
+        snprintf_P(payload, len+1, PSTR("%s"), rules_tostring(-1));
       } break;
       case VINTEGER: {
-        int val = rules_tointeger(obj, -1);
+        int val = rules_tointeger(-1);
         len = snprintf_P(NULL, 0, PSTR("%d"), val);
         if((payload = (char *)MALLOC(len+1)) == NULL) {
           OUT_OF_MEMORY
@@ -588,7 +588,7 @@ static int8_t vm_value_set(struct rules_t *obj) {
         snprintf_P(payload, len+1, PSTR("%d"), val);
       } break;
       case VFLOAT: {
-        float val = rules_tofloat(obj, -1);
+        float val = rules_tofloat(-1);
         len = snprintf_P(NULL, 0, PSTR("%g"), val);
         if((payload = (char *)MALLOC(len+1)) == NULL) {
           OUT_OF_MEMORY
@@ -636,19 +636,19 @@ static int8_t vm_value_set(struct rules_t *obj) {
         if(heishaOTDataStruct[x].type == TBOOL) {
           switch(type) {
             case VINTEGER: {
-              heishaOTDataStruct[x].value.b = (bool)rules_tointeger(obj, -1);
+              heishaOTDataStruct[x].value.b = (bool)rules_tointeger(-1);
             } break;
             case VFLOAT: {
-              heishaOTDataStruct[x].value.b = (bool)rules_tofloat(obj, -1);
+              heishaOTDataStruct[x].value.b = (bool)rules_tofloat(-1);
             } break;
           }
         } else if(heishaOTDataStruct[x].type == TFLOAT) {
           switch(type) {
             case VINTEGER: {
-              heishaOTDataStruct[x].value.f = (float)rules_tointeger(obj, -1);
+              heishaOTDataStruct[x].value.f = (float)rules_tointeger(-1);
             } break;
             case VFLOAT: {
-              heishaOTDataStruct[x].value.f = rules_tointeger(obj, -1);
+              heishaOTDataStruct[x].value.f = rules_tointeger(-1);
             } break;
           }
         }
@@ -695,26 +695,26 @@ static int8_t vm_value_set(struct rules_t *obj) {
         if(array->type == VCHAR && array->val.s != NULL) {
           rules_unref(array->val.s);
         }
-        array->val.i = rules_tointeger(obj, -1);
+        array->val.i = rules_tointeger(-1);
         array->type = VINTEGER;
       } break;
       case VFLOAT: {
         if(array->type == VCHAR && array->val.s != NULL) {
           rules_unref(array->val.s);
         }
-        array->val.f = rules_tofloat(obj, -1);
+        array->val.f = rules_tofloat(-1);
         array->type = VFLOAT;
       } break;
       case VCHAR: {
         uint8_t doref = 1;
         if(array->type == VCHAR && array->val.s != NULL) {
-          if(strcmp(rules_tostring(obj, -1), array->val.s) != 0) {
+          if(strcmp(rules_tostring(-1), array->val.s) != 0) {
             rules_unref(array->val.s);
           } else {
             doref = 0;
           }
         }
-        array->val.s = rules_tostring(obj, -1);
+        array->val.s = rules_tostring(-1);
         array->type = VCHAR;
         if(doref == 1) {
           rules_ref(array->val.s);
