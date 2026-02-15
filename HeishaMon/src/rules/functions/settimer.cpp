@@ -20,7 +20,7 @@
 #include "../rules.h"
 #include "../../common/timerqueue.h"
 
-int8_t rule_function_set_timer_callback() {
+int8_t rule_function_set_timer_callback(void) {
   struct timerqueue_t *node = NULL;
   struct itimerval it_val;
   uint16_t sec = 0, nr = 0;

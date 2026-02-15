@@ -15,7 +15,7 @@
 #include "../function.h"
 #include "../rules.h"
 
-int8_t rule_function_isset_callback() {
+int8_t rule_function_isset_callback(void) {
   uint8_t x = rules_gettop();
   uint8_t ret = 0;
 

@@ -15,7 +15,7 @@
 #include "../function.h"
 #include "../rules.h"
 
-int8_t rule_function_gpio_callback() {
+int8_t rule_function_gpio_callback(void) {
   int8_t gpio = 0, state = 0;
   uint8_t nr = rules_gettop(), x = 1;
 
