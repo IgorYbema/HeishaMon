@@ -40,7 +40,6 @@
 
 #define EPSILON 0.000001
 #define JMPSIZE 37
-#define DEBUG
 
 #if (!defined(NON32XFER_HANDLER) && defined(MMU_SEC_HEAP)) || defined(COVERALLS)
   #define getval(a) \
