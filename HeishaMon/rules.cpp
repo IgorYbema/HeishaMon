@@ -445,6 +445,7 @@ static int8_t vm_value_get(struct rules_t *obj) {
         char *str = (char *)dataValue.c_str();
         if(strlen(str) == 0) {
           rules_pushnil();
+          return 0;
         } else if(check_is_number(str) == 0) {
           float var = atof(str);
           float nr = 0;
@@ -458,6 +459,7 @@ static int8_t vm_value_get(struct rules_t *obj) {
           }
         } else {
           rules_pushstring(str);
+          return 0;
         }
       }
     }
@@ -469,6 +471,7 @@ static int8_t vm_value_get(struct rules_t *obj) {
         char *str = (char *)dataValue.c_str();
         if(strlen(str) == 0) {
           rules_pushnil();
+          return 0;
         } else if(check_is_number(str) == 0) {
           float var = atof(str);
           float nr = 0;
@@ -482,6 +485,7 @@ static int8_t vm_value_get(struct rules_t *obj) {
           }
         } else {
           rules_pushstring(str);
+          return 0;
         }
       }
     }
@@ -493,6 +497,7 @@ static int8_t vm_value_get(struct rules_t *obj) {
         char *str = (char *)dataValue.c_str();
         if(strlen(str) == 0) {
           rules_pushnil();
+          return 0;
         } else if(check_is_number(str) == 0) {
           float var = atof(str);
           float nr = 0;
@@ -506,6 +511,7 @@ static int8_t vm_value_get(struct rules_t *obj) {
           }
         } else {
           rules_pushstring(str);
+          return 0;
         }
       }
     }
@@ -519,6 +525,7 @@ static int8_t vm_value_get(struct rules_t *obj) {
     }
     if(table == NULL) {
       rules_pushnil();
+      return 0;
     } else {
       for(x=0;x<table->nr;x++) {
         if(strcmp(table->array[x].key, key) == 0) {
@@ -528,19 +535,24 @@ static int8_t vm_value_get(struct rules_t *obj) {
       }
       if(array == NULL) {
         rules_pushnil();
+        return 0;
       } else {
         switch(array->type) {
           case VINTEGER: {
             rules_pushinteger(array->val.i);
+            return 0;
           } break;
           case VFLOAT: {
             rules_pushfloat(array->val.f);
+            return 0;
           } break;
           case VCHAR: {
             rules_pushstring((char *)array->val.s);
+            return 0;
           } break;
           case VNULL: {
             rules_pushnil();
+            return 0;
           } break;
         }
       }
