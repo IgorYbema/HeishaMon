@@ -148,6 +148,25 @@ String getErrorInfo(char* data) { // TOP44 //
   return String(Error_string);
 }
 
+String addFractionalValue(String value, char* data, byte fractional_index, byte shift) {
+  int fractional = (int)((data[fractional_index] >> shift) & 0b111);
+  switch (fractional) {
+    case 1: // fractional .00
+      break;
+    case 2: // fractional .25
+      value += ".25";
+      break;
+    case 3: // fractional .50
+      value += ".50";
+      break;
+    case 4: // fractional .75
+      value += ".75";
+      break;
+    default:
+      break;
+  }
+  return value;
+}
 
 void resetlastalldatatime() {
   lastalldatatime = 0;
@@ -155,64 +174,39 @@ void resetlastalldatatime() {
   lastalloptdatatime = 0;
 }
 
+byte getByteForTopic(char* data, unsigned int Topic_Number) {
+  byte index;
+  memcpy_P(&index, &topicBytes[Topic_Number], sizeof(byte));
+  return data[index];
+}
+
 String getDataValue(char* data, unsigned int Topic_Number) {
   String Topic_Value;
-  byte Input_Byte;
   switch (Topic_Number) { //switch on topic numbers, some have special needs
     case 1:
       Topic_Value = getPumpFlow(data);
       break;
-    case 5: {
-        byte cpy;
-        memcpy_P(&cpy, &topicBytes[Topic_Number], sizeof(byte));
-        Input_Byte = data[cpy];
-        Topic_Value = topicFunctions[Topic_Number](Input_Byte);
-        int fractional = (int)(data[118] & 0b111);
-        switch (fractional) {
-          case 1: // fractional .00
-            break;
-          case 2: // fractional .25
-            Topic_Value = Topic_Value + ".25";
-            break;
-          case 3: // fractional .50
-            Topic_Value = Topic_Value + ".50";
-            break;
-          case 4: // fractional .75
-            Topic_Value = Topic_Value + ".75";
-            break;
-          default:
-            break;
-        }
-      }
+    case 5:
+      Topic_Value = topicFunctions[Topic_Number](getByteForTopic(data, Topic_Number));
+      Topic_Value = addFractionalValue(Topic_Value, data, 118, 0);
       break;
-    case 6: {
-        byte cpy;
-        memcpy_P(&cpy, &topicBytes[Topic_Number], sizeof(byte));
-        Input_Byte = data[cpy];
-        Topic_Value = topicFunctions[Topic_Number](Input_Byte);
-        int fractional = (int)((data[118] >> 3) & 0b111) ;
-        switch (fractional) {
-          case 1: // fractional .00
-            break;
-          case 2: // fractional .25
-            Topic_Value = Topic_Value + ".25";
-            break;
-          case 3: // fractional .50
-            Topic_Value = Topic_Value + ".50";
-            break;
-          case 4: // fractional .75
-            Topic_Value = Topic_Value + ".75";
-            break;
-          default:
-            break;
-        }
-      }
+    case 6:
+      Topic_Value = topicFunctions[Topic_Number](getByteForTopic(data, Topic_Number));
+      Topic_Value = addFractionalValue(Topic_Value, data, 118, 3);
       break;
     case 11:
       Topic_Value = String(word(data[183], data[182]) - 1);
       break;
     case 12:
       Topic_Value = String(word(data[180], data[179]) - 1);
+      break;
+    case 56:
+      Topic_Value = topicFunctions[Topic_Number](getByteForTopic(data, Topic_Number));
+      Topic_Value = addFractionalValue(Topic_Value, data, 119, 0);
+      break;
+    case 57:
+      Topic_Value = topicFunctions[Topic_Number](getByteForTopic(data, Topic_Number));
+      Topic_Value = addFractionalValue(Topic_Value, data, 119, 3);
       break;
     case 90:
       Topic_Value = String(word(data[186], data[185]) - 1);
@@ -227,10 +221,7 @@ String getDataValue(char* data, unsigned int Topic_Number) {
       Topic_Value = getModel(data);
       break;
     default:
-      byte cpy;
-      memcpy_P(&cpy, &topicBytes[Topic_Number], sizeof(byte));
-      Input_Byte = data[cpy];
-      Topic_Value = topicFunctions[Topic_Number](Input_Byte);
+      Topic_Value = topicFunctions[Topic_Number](getByteForTopic(data, Topic_Number));
       break;
   }
   return Topic_Value;
