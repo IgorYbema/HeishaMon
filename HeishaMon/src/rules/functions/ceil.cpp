@@ -58,9 +58,9 @@ int8_t rule_function_ceil_callback(void) {
     rules_pushinteger(x);
   } else {
 #ifdef DEBUG
-    printf("\tround = %d\n", (int)ceil(x));
+    printf("\tround = %d\n", (int)ceilf(x));
 #endif
-    rules_pushinteger((int)ceil(x));
+    rules_pushinteger((int)ceilf(x));
   }
 
   return 0;

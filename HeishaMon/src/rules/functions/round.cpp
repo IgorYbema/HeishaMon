@@ -17,6 +17,7 @@
 
 #include "../../common/uint32float.h"
 #include "../../common/log.h"
+#include "../../common/mem.h"
 #include "../function.h"
 #include "../rules.h"
 
@@ -69,23 +70,28 @@ int8_t rule_function_round_callback(void) {
 
   if(modff(x, &z) == 0) {
 #ifdef DEBUG
-    printf("\tround = %d\n", round(x));
+    printf("\tround = %d\n", (int)roundf(x));
 #endif
-    rules_pushinteger(round(x));
+    rules_pushinteger(roundf(x));
   } else {
     if(y == 2) {
-      uint8_t size = snprintf(NULL, 0, "%.*f", dec, x)+1;
-      char buf[size] = { '\0' };
-      snprintf((char *)&buf, size, "%.*f", dec, x);
+      uint8_t size = snprintf(NULL, 0, "%.*f", dec, (double)x)+1;
+      char *buf = (char *)MALLOC(size);
+      if(buf == NULL) {
+        OUT_OF_MEMORY
+      }
+      memset(buf, 0, size);
+      snprintf((char *)buf, size, "%.*f", dec, (double)x);
 #ifdef DEBUG
       printf("\tround = %f\n", atof(buf));
 #endif
       rules_pushfloat(atof(buf));
+      FREE(buf);
     } else {
 #ifdef DEBUG
-      printf("\tround = %d\n", round(x));
+      printf("\tround = %d\n", (int)roundf(x));
 #endif
-      rules_pushinteger(round(x));
+      rules_pushinteger(roundf(x));
     }
   }
 

@@ -38,7 +38,7 @@
 #include "operator.h"
 #include "function.h"
 
-#define EPSILON 0.000001
+#define EPSILON 0.000001f
 #define JMPSIZE 37
 
 #if (!defined(NON32XFER_HANDLER) && defined(MMU_SEC_HEAP)) || defined(COVERALLS)
@@ -548,7 +548,7 @@ static uint16_t varstack_add(char **text, uint16_t start, uint16_t len, uint8_t 
   struct vm_vchar_t *value = (struct vm_vchar_t *)&varstack->buffer[a];
 
 #ifdef DEBUG
-  assert(a/sizeof(struct vm_vchat_t *)/2 <= 127);
+  assert(a/sizeof(struct vm_vchar_t *)/2 <= 127);
 #endif
 
   i = varstack_find(text, start, len);
@@ -907,7 +907,7 @@ static int8_t rule_prepare(char **text,
           setval((*text)[tpos], VINTEGER); tpos++;
           x = (uint32_t)var;
           if((var < 0 && var < -8388608) || (var > 0 && var > 16777215)) {
-            logprintf_P(F("FATAL: Integer %g is out of range"), __FUNCTION__, __LINE__, var);
+            logprintf_P(F("FATAL: Integer %g is out of range"), __FUNCTION__, __LINE__, (double)var);
             return -1;
           }
         } else {
@@ -3069,7 +3069,7 @@ static int16_t rule_create(char **text, struct rules_t *obj) {
 
   while(loop) {
 #ifdef ESP8266
-    ESP.wdtFeed();;
+    ESP.wdtFeed();
 #endif
 #ifdef DEBUG
     printf("%s %d %d %d %d %s\n", __FUNCTION__, __LINE__, depth, pos, getval(obj->bc.nrbytes), token_names[go].name);
@@ -3485,82 +3485,133 @@ static int16_t rule_create(char **text, struct rules_t *obj) {
       case TNUMBER2:
       case TNUMBER3:{
       TVAR_AS_VALUE:
-        go = ret;
-        ret = TNUMBER;
+        if(lexer_peek(text, pos+1, &type, &start, &len) >= 0 && type == TOPERATOR) {
+        } else if(lexer_peek(text, pos, &type, &start, &len) < 0) {
+          /* LCOV_EXCL_START*/
+          logprintf_P(F("FATAL: Internal error in %s #%d"), __FUNCTION__, __LINE__);
+          return -1;
+          /* LCOV_EXCL_STOP*/
+        }
 
-        int32_t a = 0;
-        if(in_child > -1) {
+        if(type == TOPERATOR) {
+          go = TOPERATOR;
+          ret = TNUMBER1;
+        } else if(type == RPAREN) {
+          if(in_child == -1) {
+            /* LCOV_EXCL_START*/
+            logprintf_P(F("FATAL: Internal error in %s #%d"), __FUNCTION__, __LINE__);
+            return -1;
+            /* LCOV_EXCL_STOP*/
+          }
           if(lexer_peek(text, in_child, &type, &start, &len) < 0) {
             /* LCOV_EXCL_START*/
             logprintf_P(F("FATAL: Internal error in %s #%d"), __FUNCTION__, __LINE__);
             return -1;
             /* LCOV_EXCL_STOP*/
           }
-          a = type;
-        }
 
-        if(lexer_peek(text, pos, &type, &start, &len) < 0) {
-          /* LCOV_EXCL_START*/
-          logprintf_P(F("FATAL: Internal error in %s #%d"), __FUNCTION__, __LINE__);
-          return -1;
-          /* LCOV_EXCL_STOP*/
-        }
-
-        if(a == TEVENT && in_child == 0) {
-          if(type == TVAR) {
-            uint16_t c = varstack_add(text, start+1, len, 1);
-            uint16_t d = bc_parent(obj, OP_SETVAL, c/sizeof(struct vm_vchar_t), 0, 0);
-            int32_t e = bc_before(d);
-            if(e >= 0 && gettype(obj->bc.buffer[e]) != OP_GETVAL) {
-              mathcnt = 0;
+          if(ret == TNUMBER || ret == TOPERATOR || ret == TSTRING) {
+            if(type == TFUNCTION || (type == TEVENT && in_child > 0)) {
+              if(ret == TSTRING) {
+                bc_parent(obj, OP_PUSH, val, 0, 1);
+              } else {
+                bc_parent(obj, OP_PUSH, val, 0, 0);
+              }
             }
+          }
+
+          /*
+           * Don't go back to `in_child` if we are
+           * inside a simple hook set: if (3 == 3) then
+           *                              ^      ^
+           * instead of: $a = max(3, 3)
+           * where we can return to TFUNCTION
+           */
+          if(type == LPAREN) {
+            go = RPAREN;
+            ret = LPAREN;
           } else {
+            ret = go;
+            go = type;
+          }
+        } else {
+          go = ret;
+          ret = TNUMBER;
+
+          int32_t a = 0;
+          if(in_child > -1) {
+            if(lexer_peek(text, in_child, &type, &start, &len) < 0) {
+              /* LCOV_EXCL_START*/
+              logprintf_P(F("FATAL: Internal error in %s #%d"), __FUNCTION__, __LINE__);
+              return -1;
+              /* LCOV_EXCL_STOP*/
+            }
+            a = type;
+          }
+
+          if(lexer_peek(text, pos, &type, &start, &len) < 0) {
             /* LCOV_EXCL_START*/
             logprintf_P(F("FATAL: Internal error in %s #%d"), __FUNCTION__, __LINE__);
             return -1;
             /* LCOV_EXCL_STOP*/
           }
-        } else {
-          if(type == TSTRING) {
-            uint16_t c = varstack_add(text, start+1, len, 1);
-            a = (c/sizeof(struct vm_vchar_t))+1;
-            ret = TSTRING;
-          } else if(type == TVAR) {
-            uint16_t c = varstack_add(text, start+1, len, 1);
-            // a = vm_heap_push(obj, VNULL, NULL, 0, 0, 0);
-            // a = vm_val_posr(a);
-            a = ++mathcnt;
-            bc_parent(obj, OP_GETVAL, a, c/sizeof(struct vm_vchar_t), 0);
-          } else {
-            if(type == VNULL) {
-              a = vm_heap_push(obj, type, text, 1, 0, 0);
+
+          if(a == TEVENT && in_child == 0) {
+            if(type == TVAR) {
+              uint16_t c = varstack_add(text, start+1, len, 1);
+              uint16_t d = bc_parent(obj, OP_SETVAL, c/sizeof(struct vm_vchar_t), 0, 0);
+              int32_t e = bc_before(d);
+              if(e >= 0 && gettype(obj->bc.buffer[e]) != OP_GETVAL) {
+                mathcnt = 0;
+              }
             } else {
-              a = vm_heap_push(obj, type, text, start, len, 0);
+              /* LCOV_EXCL_START*/
+              logprintf_P(F("FATAL: Internal error in %s #%d"), __FUNCTION__, __LINE__);
+              return -1;
+              /* LCOV_EXCL_STOP*/
             }
-            a = vm_val_posr(a);
+          } else {
+            if(type == TSTRING) {
+              uint16_t c = varstack_add(text, start+1, len, 1);
+              a = (c/sizeof(struct vm_vchar_t))+1;
+              ret = TSTRING;
+            } else if(type == TVAR) {
+              uint16_t c = varstack_add(text, start+1, len, 1);
+              // a = vm_heap_push(obj, VNULL, NULL, 0, 0, 0);
+              // a = vm_val_posr(a);
+              a = ++mathcnt;
+              bc_parent(obj, OP_GETVAL, a, c/sizeof(struct vm_vchar_t), 0);
+            } else {
+              if(type == VNULL) {
+                a = vm_heap_push(obj, type, text, 1, 0, 0);
+              } else {
+                a = vm_heap_push(obj, type, text, start, len, 0);
+              }
+              a = vm_val_posr(a);
+            }
           }
-        }
 
-        if(lexer_peek(text, pos+1, &type, &start, &len) < 0) {
-          /* LCOV_EXCL_START*/
-          logprintf_P(F("FATAL: Internal error in %s #%d"), __FUNCTION__, __LINE__);
-          return -1;
-          /* LCOV_EXCL_STOP*/
-        }
-        switch(type) {
-          case TCOMMA:
-          case TSEMICOLON:
-          case TTHEN:
-          case RPAREN: {
-          } break;
-          default: {
-            logprintf_P(F("ERROR: Unexpected token (%d)"), __LINE__);
+          if(lexer_peek(text, pos+1, &type, &start, &len) < 0) {
+            /* LCOV_EXCL_START*/
+            logprintf_P(F("FATAL: Internal error in %s #%d"), __FUNCTION__, __LINE__);
             return -1;
-          } break;
-        }
+            /* LCOV_EXCL_STOP*/
+          }
+          switch(type) {
+            case TCOMMA:
+            case TSEMICOLON:
+            case TTHEN:
+            case RPAREN: {
+            } break;
+            default: {
+              logprintf_P(F("ERROR: Unexpected token (%d)"), __LINE__);
+              return -1;
+            } break;
+          }
 
-        val = a;
-        pos++;
+          val = a;
+          pos++;
+        }
       } break;
       case TASSIGN: {
         uint16_t tmp = pos;
@@ -4430,7 +4481,7 @@ int8_t rule_run(struct rules_t *obj, uint8_t validate) {
       var = x*y;
       goto STEP_MATH_RESULT;
     STEP_OP_POW:
-      var = pow(x, y);
+      var = powf(x, y);
       goto STEP_MATH_RESULT;
     STEP_OP_MOD:
       var = fmodf(x, y);
@@ -4475,11 +4526,11 @@ int8_t rule_run(struct rules_t *obj, uint8_t validate) {
       }
 
       if(x_type != VNULL && y_type != VNULL) {
-        printf("\t%g %s %g = %g -> %d\n", x, op, y, var, vm_val_posr(a));
+        printf("\t%g %s %g = %g -> %d\n", (double)x, op, (double)y, (double)var, vm_val_posr(a));
       } else if(x_type != VNULL && y_type == VNULL) {
-        printf("\t%g %s NULL = %g -> %d\n", x, op, var, vm_val_posr(a));
+        printf("\t%g %s NULL = %g -> %d\n", (double)x, op, (double)var, vm_val_posr(a));
       } else if(x_type == VNULL && y_type != VNULL) {
-        printf("\tNULL %s %g = %g -> %d\n", op, y, var, vm_val_posr(a));
+        printf("\tNULL %s %g = %g -> %d\n", op, (double)y, (double)var, vm_val_posr(a));
       } else {
         printf("\tNULL %s NULL = NULL -> %d\n", op, vm_val_posr(a));
       }
@@ -4506,11 +4557,11 @@ int8_t rule_run(struct rules_t *obj, uint8_t validate) {
         }
 
         if(x_type == VNULL && y_type == VNULL) {
-          printf("\tNULL %s %g = %g -> %d\n", op, y, var, vm_val_posr(a));
+          printf("\tNULL %s %g = %g -> %d\n", op, (double)y, (double)var, vm_val_posr(a));
         } else if(x_type != VNULL && y_type == VNULL) {
-          printf("\tNULL %s %g = %g -> %d\n", op, x, var, vm_val_posr(a));
+          printf("\tNULL %s %g = %g -> %d\n", op, (double)x, (double)var, vm_val_posr(a));
         } else if(x_type != VNULL && y_type != VNULL) {
-          printf("\t%g %s %g = %g -> %d\n", x, op, y, var, vm_val_posr(a));
+          printf("\t%g %s %g = %g -> %d\n", (double)x, op, (double)y, (double)var, vm_val_posr(a));
         } else {
           printf("\tNULL %s NULL = NULL -> %d\n", op, vm_val_posr(a));
         }
@@ -4539,11 +4590,11 @@ int8_t rule_run(struct rules_t *obj, uint8_t validate) {
         }
 
         if(x_type == VNULL && y_type == VNULL) {
-          printf("\tNULL %s %g = %g -> %d\n", op, y, var, vm_val_posr(a));
+          printf("\tNULL %s %g = %g -> %d\n", op, (double)y, (double)var, vm_val_posr(a));
         } else if(x_type != VNULL && y_type == VNULL) {
-          printf("\tNULL %s %g = %g -> %d\n", op, x, var, vm_val_posr(a));
+          printf("\tNULL %s %g = %g -> %d\n", op, (double)x, (double)var, vm_val_posr(a));
         } else if(x_type != VNULL && y_type != VNULL) {
-          printf("\t%g %s %g = %g -> %d\n", x, op, y, var, vm_val_posr(a));
+          printf("\t%g %s %g = %g -> %d\n", (double)x, op, (double)y, (double)var, vm_val_posr(a));
         } else {
           printf("\tNULL %s NULL = NULL -> %d\n", op, vm_val_posr(a));
         }
@@ -5070,7 +5121,7 @@ static void print_heap(struct rules_t *obj) {
 
         float f = 0;
         uint322float(val, &f);
-        printf("VFLOAT\t\t%g\n", f);
+        printf("VFLOAT\t\t%g\n", (double)f);
       } break;
       case VNULL: {
         printf("VNULL\n");
@@ -5141,7 +5192,7 @@ static void print_stack(struct rules_t *obj) {
         float f = 0;
         uint322float(val, &f);
 
-        printf("VFLOAT\t\t%g\n", f);
+        printf("VFLOAT\t\t%g\n", (double)f);
       } break;
       case VNULL: {
         printf("VNULL\n");

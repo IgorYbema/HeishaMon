@@ -58,9 +58,9 @@ int8_t rule_function_floor_callback(void) {
     rules_pushinteger(x);
   } else {
 #ifdef DEBUG
-    printf("\tfloor = %d\n", (int)floor(x));
+    printf("\tfloor = %d\n", (int)floorf(x));
 #endif
-    rules_pushinteger((int)floor(x));
+    rules_pushinteger((int)floorf(x));
   }
 
   return 0;

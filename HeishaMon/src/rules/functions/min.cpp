@@ -59,7 +59,7 @@ int8_t rule_function_min_callback(void) {
     rules_pushinteger(x);
   } else {
 #ifdef DEBUG
-    printf("\tmin = %f\n", x);
+    printf("\tmin = %f\n", (double)x);
 #endif
     rules_pushfloat(x);
   }

@@ -17,6 +17,7 @@
 
 #include "../../common/uint32float.h"
 #include "../../common/log.h"
+#include "../../common/mem.h"
 #include "../function.h"
 #include "../rules.h"
 
@@ -33,7 +34,7 @@ int8_t rule_function_print_callback(void) {
         len += snprintf(NULL, 0, "%d", rules_tointeger(y));
       } break;
       case VFLOAT: {
-        len += snprintf(NULL, 0, "%g", rules_tofloat(y));
+        len += snprintf(NULL, 0, "%g", (double)rules_tofloat(y));
       } break;
       case VCHAR: {
         len += strlen(rules_tostring(y));
@@ -43,7 +44,11 @@ int8_t rule_function_print_callback(void) {
 
   if(len > 0) {
     len++;
-    char out[len] = { '\0' };
+    char *out = (char *)MALLOC(len);
+    if(out == NULL) {
+      OUT_OF_MEMORY
+    }
+    memset(out, 0, len);
 
     for(y=1;y<=nr;y++) {
       switch(rules_type(y)) {
@@ -54,7 +59,7 @@ int8_t rule_function_print_callback(void) {
           offset += snprintf(&out[offset], len-offset, "%d", rules_tointeger(y));
         } break;
         case VFLOAT: {
-          offset += snprintf(&out[offset], len-offset, "%g", rules_tofloat(y));
+          offset += snprintf(&out[offset], len-offset, "%g", (double)rules_tofloat(y));
         } break;
         case VCHAR: {
           offset += snprintf(&out[offset], len-offset, "%s", rules_tostring(y));
@@ -62,6 +67,7 @@ int8_t rule_function_print_callback(void) {
       }
     }
     logprintf(out);
+    FREE(out);
   }
 
   while(nr > 0) {

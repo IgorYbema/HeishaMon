@@ -60,7 +60,7 @@ int8_t rule_function_coalesce_callback(void) {
       rules_pushinteger(x);
     } else {
 #ifdef DEBUG
-      printf("\tcoalesce = %f\n", x);
+      printf("\tcoalesce = %f\n", (double)x);
 #endif
       rules_pushfloat(x);
     }
