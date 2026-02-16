@@ -170,16 +170,13 @@ void setupETH() {
 /*
     check_wifi will process wifi reconnecting managing
 */
+#if defined(ESP8266)
 void check_wifi() {
   int wifistatus = WiFi.status();
   if ((wifistatus != WL_CONNECTED) && (WiFi.localIP())) {
     // special case where it seems that we are not connect but we do have working IP (causing the -1% wifi signal), do a reset.
-#ifdef ESP8266
     log_message(_F("Weird case, WiFi seems disconnected but is not. Resetting WiFi!"));
     setupWifi(&heishamonSettings);
-#else
-    log_message(_F("WiFi just got disconnected, still have IP addres."));
-#endif
   } else if ((wifistatus != WL_CONNECTED) || (!WiFi.localIP())) {
     /*
         if we are not connected to an AP
@@ -187,32 +184,21 @@ void check_wifi() {
     */
     if (heishamonSettings.hotspot) {
       dnsServer.processNextRequest();
-#ifdef ESP32
-      neoPixelState = pixels.Color(16, 16, 0);  //set neopixel to yellow to indicate lost wifi
-#endif
     }
 
     /* we need to stop reconnecting to a configured wifi network if there is a hotspot user connected
         also, do not disconnect if wifi network scan is active
     */
-#ifdef ESP8266
     if ((heishamonSettings.wifi_ssid[0] != '\0') && (wifistatus != WL_DISCONNECTED) && (WiFi.scanComplete() != -1) && (WiFi.softAPgetStationNum() > 0)) {
       log_message(_F("WiFi lost, but softAP station connecting, so stop trying to connect to configured ssid..."));
       WiFi.disconnect(true);
     }
-#else
-    if ((heishamonSettings.wifi_ssid[0] != '\0') && (wifistatus != WL_STOPPED) && (WiFi.scanComplete() != -1) && (WiFi.softAPgetStationNum() > 0)) {
-      log_message(_F("WiFi lost, but softAP station connecting, so stop trying to connect to configured ssid..."));
-      WiFi.mode(WIFI_AP);
-    }
-#endif
 
     /*  only start this routine if timeout on
         reconnecting to AP and SSID is set
     */
     if ((heishamonSettings.wifi_ssid[0] != '\0') && ((unsigned long)(millis() - lastWifiRetryTimer) > WIFIRETRYTIMER)) {
       lastWifiRetryTimer = millis();
-#ifdef ESP8266
       if ((WiFi.softAPSSID() == "") && (heishamonSettings.hotspot)) {
         log_message(_F("WiFi lost, starting setup hotspot..."));
         WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
@@ -220,45 +206,23 @@ void check_wifi() {
       }
       if ((wifistatus == WL_DISCONNECTED) && (WiFi.softAPgetStationNum() == 0)) {
         log_message(_F("Retrying configured WiFi, ..."));
-#else
-      if (((WiFi.getMode() & WIFI_MODE_AP) == 0) && (heishamonSettings.hotspot)) {
-        log_message(_F("WiFi lost, starting setup hotspot..."));
-        WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
-        WiFi.softAP(_F("HeishaMon-Setup"));
-      }
-      if ((wifistatus == WL_STOPPED  ) && (WiFi.softAPgetStationNum() == 0)) { //make sure we start STA again if it was stopped
-        log_message(_F("Retrying configured WiFi, ..."));
-        WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN); //select best AP with same SSID
-#endif
         if (heishamonSettings.wifi_password[0] == '\0') {
           WiFi.begin(heishamonSettings.wifi_ssid);
         } else {
           WiFi.begin(heishamonSettings.wifi_ssid, heishamonSettings.wifi_password);
         }
-#ifdef ESP8266        
       } else {
         log_message(_F("Reconnecting to WiFi failed. Waiting a few seconds before trying again."));
         WiFi.disconnect(true);
-#endif        
       }
     }
   }
-#ifdef ESP8266
   if (WiFi.localIP()) {  //WiFi connected
     if (WiFi.softAPSSID() != "") {
       log_message(_F("WiFi (re)connected, shutting down hotspot..."));
       WiFi.softAPdisconnect(true);
       MDNS.notifyAPChange();
     }
-#else
-  if (WiFi.localIP() || ETH.hasIP()) {      //WiFi or ETH connected and IP>0  check if active AP and disable if yes
-    neoPixelState = pixels.Color(0, 0, 0);  //neopixel should be black again to indicate normale working      
-    if (((WiFi.getMode() & WIFI_MODE_AP) != 0) && ((heishamonSettings.wifi_ssid[0] != '\0') || (!heishamonSettings.hotspot)) ) { //shutdown hotspot if it is running with configured SSID or if hotspot config is disabled
-      log_message(_F("WiFi or ETH (re)connected, shutting down hotspot..."));
-      WiFi.softAP("");
-      WiFi.softAPdisconnect(true);
-    }
-#endif
 
     if (firstConnectSinceBoot) {  // this should start only when softap is down or else it will not work properly so run after the routine to disable softap
       firstConnectSinceBoot = false;
@@ -266,9 +230,7 @@ void check_wifi() {
       setupOTA();
       MDNS.begin(heishamonSettings.wifi_hostname);
       MDNS.addService("http", "tcp", 80);
-#ifdef ESP8266
       experimental::ESP8266WiFiGratuitous::stationKeepAliveSetIntervalMs(5000);  //necessary for some users with bad wifi routers
-#endif
 
       if (heishamonSettings.wifi_ssid[0] == '\0') {
         log_message(_F("WiFi connected without SSID and password in settings. Must come from persistent memory. Storing in settings."));
@@ -290,22 +252,128 @@ void check_wifi() {
     */
     lastWifiRetryTimer = millis();
 
-#ifdef ESP8266
     // Allow MDNS processing
     MDNS.update();
-#endif
   }
   if (doInitialWifiScan && (millis() > 15000)) {  //do a wifi scan a boot after 15 seconds
     doInitialWifiScan = false;
     log_message(_F("Starting initial wifi scan ..."));
-#if defined(ESP8266)
     WiFi.scanNetworksAsync(getWifiScanResults);
-#elif defined(ESP32)
-    WiFi.scanNetworks(true);
-#endif
   }
 }
+#elif defined(ESP32)
+void check_wifi() {
+  wl_status_t wifistatus = WiFi.status();
+  bool ethUp = ETH.hasIP();
+  bool wifiUp = (wifistatus == WL_CONNECTED);
 
+  /* ---------- Fast path: network is up ---------- */
+  if (wifiUp || ethUp) {
+
+    neoPixelState = pixels.Color(0, 0, 0); // normal operation
+    lastWifiRetryTimer = millis();
+
+    // Shut down hotspot if no longer needed
+    if ((WiFi.getMode() & WIFI_MODE_AP) &&
+        ((heishamonSettings.wifi_ssid[0] != '\0') || !heishamonSettings.hotspot)) {
+
+      log_message(_F("WiFi or ETH connected, shutting down hotspot"));
+      WiFi.softAPdisconnect(true);
+      WiFi.mode(WIFI_STA);
+      if (wifistatus != WL_CONNECTED) { //it must be that ETH reconnected, so keep trying WiFi in the background
+        WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+        if (heishamonSettings.wifi_password[0] == '\0') {
+          WiFi.begin(heishamonSettings.wifi_ssid);
+        } else {
+          WiFi.begin(heishamonSettings.wifi_ssid, heishamonSettings.wifi_password);
+        }
+      }
+    }
+
+    if (firstConnectSinceBoot) {
+      firstConnectSinceBoot = false;
+
+      lastMqttReconnectAttempt = 0;
+      setupOTA();
+
+      MDNS.begin(heishamonSettings.wifi_hostname);
+      MDNS.addService("http", "tcp", 80);
+
+      if (heishamonSettings.wifi_ssid[0] == '\0') {
+        log_message(_F("Storing WiFi credentials from persistent memory"));
+        WiFi.SSID().toCharArray(heishamonSettings.wifi_ssid, 40);
+        WiFi.psk().toCharArray(heishamonSettings.wifi_password, 40);
+        JsonDocument jsonDoc;
+        settingsToJson(jsonDoc, &heishamonSettings);
+        saveJsonToFile(jsonDoc, "config.json");
+      }
+
+      ntpReload(&heishamonSettings);
+      logprintln_P(F("NTP sync scheduled"));
+      timerqueue_insert(300, 0, -6);
+    }
+
+    return;
+  }
+
+  /* ---------- Network is DOWN ---------- */
+
+  neoPixelState = pixels.Color(16, 16, 0); // yellow: degraded
+
+  if (heishamonSettings.hotspot) {
+    dnsServer.processNextRequest();
+  }
+
+  // If AP client is connected, STA must back off
+  if (WiFi.softAPgetStationNum() > 0) {
+    if (WiFi.getMode() != WIFI_AP) {
+      log_message(_F("SoftAP client active, suspending STA reconnect"));
+	    WiFi.disconnect(true);
+	    WiFi.mode(WIFI_AP);
+    }
+	  return; //always return if hotspot is used
+  }
+
+  // Periodic retry gate
+  if ((unsigned long)(millis() - lastWifiRetryTimer) < WIFIRETRYTIMER) {
+    return;
+  }
+  lastWifiRetryTimer = millis();
+
+  // Ensure AP is running if allowed
+  if (heishamonSettings.hotspot && !(WiFi.getMode() & WIFI_MODE_AP)) {
+    log_message(_F("Starting setup hotspot"));
+    WiFi.mode(WIFI_AP_STA);
+    WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
+    WiFi.softAP(_F("HeishaMon-Setup"));
+  }
+
+  // Disable STA so next retry is clean and we wait WIFIRETRYTIMER so hotspot can do its thing
+  if (WiFi.getMode() != WIFI_AP) {
+    log_message(_F("Disabling WiFi STA for a while..."));	
+	  WiFi.disconnect(true);
+    WiFi.mode(WIFI_AP); 
+    return;
+  }
+
+  // Retry STA connection
+  if (heishamonSettings.wifi_ssid[0] != '\0') {
+    // Repair STA if it is stopped
+    if (!(WiFi.getMode() & WIFI_MODE_STA)) {
+      log_message(_F("STA stopped, re-enabling STA"));
+      WiFi.mode(WIFI_AP_STA);
+      delay(50);
+    }    
+    log_message(_F("Retrying configured WiFi"));
+    WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+    if (heishamonSettings.wifi_password[0] == '\0') {
+      WiFi.begin(heishamonSettings.wifi_ssid);
+    } else {
+      WiFi.begin(heishamonSettings.wifi_ssid, heishamonSettings.wifi_password);
+    }
+  }
+}
+#endif
 
 void mqtt_reconnect()
 {
@@ -1752,7 +1820,6 @@ void loop() {
         if (ETH.hasIP()) {
           ethernetStat = F("connected - IP: ");
           ethernetStat += ETH.localIP().toString();
-          ethernetStat += F(")");
         } else {
           ethernetStat = F("connected - no IP");
         }

@@ -1047,6 +1047,7 @@ int handleRoot(struct webserver_t *client, float readpercentage, int mqttReconne
     case 1: {
         webserver_send_content_P(client, heishamon_version, strlen_P(heishamon_version));
         webserver_send_content_P(client, webBodyRoot2, strlen_P(webBodyRoot2));
+        webserver_send_content_P(client, webTabnavOpen, strlen_P(webTabnavOpen));
         if (heishamonSettings->use_1wire) {
           webserver_send_content_P(client, webBodyRootDallasTab, strlen_P(webBodyRootDallasTab));
         }
@@ -1056,7 +1057,7 @@ int handleRoot(struct webserver_t *client, float readpercentage, int mqttReconne
         if (heishamonSettings->opentherm) {
           webserver_send_content_P(client, webBodyRootOpenthermTab, strlen_P(webBodyRootOpenthermTab));
         }
-        webserver_send_content_P(client, webBodyRootConsoleTab, strlen_P(webBodyRootConsoleTab));
+        webserver_send_content_P(client, webTabnavClose, strlen_P(webTabnavClose));
       } break;
     case 2: {
         webserver_send_content_P(client, webBodyEndDiv, strlen_P(webBodyEndDiv));
@@ -1105,6 +1106,7 @@ int handleRoot(struct webserver_t *client, float readpercentage, int mqttReconne
         char *up = getUptime();
         webserver_send_content(client, up, strlen(up));
         free(up);
+        webserver_send_content_P(client, webBodyRootStatusEndSpan, strlen_P(webBodyRootStatusEndSpan));
         if (heishamonSettings->listenonly) {
           webserver_send_content_P(client, webBodyRootStatusListenOnly, strlen_P(webBodyRootStatusListenOnly));
         }
@@ -1356,6 +1358,7 @@ int showRules(struct webserver_t *client) {
           }
           client->userdata = NULL;
           webserver_send_content_P(client, showRulesPage2, strlen_P(showRulesPage2));
+          webserver_send_content_P(client, rulesJS, strlen_P(rulesJS));
           webserver_send_content_P(client, menuJS, strlen_P(menuJS));
           webserver_send_content_P(client, webFooter, strlen_P(webFooter));
         }
@@ -1368,6 +1371,7 @@ int showRules(struct webserver_t *client) {
         }
         client->userdata = NULL;
         webserver_send_content_P(client, showRulesPage2, strlen_P(showRulesPage2));
+        webserver_send_content_P(client, rulesJS, strlen_P(rulesJS));
         webserver_send_content_P(client, menuJS, strlen_P(menuJS));
         webserver_send_content_P(client, webFooter, strlen_P(webFooter));
       }
@@ -1380,11 +1384,13 @@ int showRules(struct webserver_t *client) {
       }
       client->userdata = NULL;
       webserver_send_content_P(client, showRulesPage2, strlen_P(showRulesPage2));
+      webserver_send_content_P(client, rulesJS, strlen_P(rulesJS));
       webserver_send_content_P(client, menuJS, strlen_P(menuJS));
       webserver_send_content_P(client, webFooter, strlen_P(webFooter));
     }
   } else if (client->content == 1) {
     webserver_send_content_P(client, showRulesPage2, strlen_P(showRulesPage2));
+    webserver_send_content_P(client, rulesJS, strlen_P(rulesJS));
     webserver_send_content_P(client, menuJS, strlen_P(menuJS));
     webserver_send_content_P(client, webFooter, strlen_P(webFooter));
   }
