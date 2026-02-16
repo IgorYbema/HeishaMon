@@ -1533,42 +1533,64 @@ function validateRules() {
   const warnings = [];
   const blockStack = [];
   
-  const lines = code.split('\n');
-  for(let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if(!line || line.startsWith('//')) continue;
+  let cleanCode = code.replace(/\/\/.*$/gm, '');
+  cleanCode = cleanCode.replace(/'[^']*'/g, '""').replace(/"[^"]*"/g, '""');
+  
+  const lines = cleanCode.split('\n');
+  
+  for(let lineNum = 0; lineNum < lines.length; lineNum++) {
+    const line = lines[lineNum];
+    const trimmed = line.trim();
     
-    if(line.startsWith('on ')) {
-      blockStack.push({type: 'on', line: i+1});
-    }
-    else if(line.startsWith('if ')) {
-      blockStack.push({type: 'if', line: i+1, hasElse: false});
-    }
-    else if(line.startsWith('elseif ')) {
-      if(blockStack.length === 0 || blockStack[blockStack.length-1].type !== 'if') {
-        errors.push('Line ' + (i+1) + ': "elseif" without matching "if"');
-      } else if(blockStack[blockStack.length-1].hasElse) {
-        errors.push('Line ' + (i+1) + ': "elseif" after "else"');
+    if(!trimmed) continue;
+    
+    const statements = trimmed.split(/;|\bthen\b/).map(s => s.trim()).filter(s => s);
+    
+    for(let stmt of statements) {
+      if(/^on\s+/.test(stmt)) {
+        blockStack.push({type: 'on', line: lineNum + 1});
+      }
+      else if(/^if\s+/.test(stmt)) {
+        blockStack.push({type: 'if', line: lineNum + 1, hasElse: false});
+      }
+      else if(/^elseif\s+/.test(stmt)) {
+        if(blockStack.length === 0 || blockStack[blockStack.length-1].type !== 'if') {
+          errors.push('Line ' + (lineNum+1) + ': "elseif" without matching "if"');
+        } else if(blockStack[blockStack.length-1].hasElse) {
+          errors.push('Line ' + (lineNum+1) + ': "elseif" after "else"');
+        }
+      }
+      else if(/^else$/.test(stmt)) {
+        if(blockStack.length === 0 || blockStack[blockStack.length-1].type !== 'if') {
+          errors.push('Line ' + (lineNum+1) + ': "else" without matching "if"');
+        } else if(blockStack[blockStack.length-1].hasElse) {
+          errors.push('Line ' + (lineNum+1) + ': Multiple "else" for same "if"');
+        } else {
+          blockStack[blockStack.length-1].hasElse = true;
+        }
+      }
+      else if(/^end$/.test(stmt)) {
+        if(blockStack.length === 0) {
+          errors.push('Line ' + (lineNum+1) + ': "end" without matching block');
+        } else {
+          blockStack.pop();
+        }
       }
     }
-    else if(line === 'else') {
-      if(blockStack.length === 0 || blockStack[blockStack.length-1].type !== 'if') {
-        errors.push('Line ' + (i+1) + ': "else" without matching "if"');
-      } else if(blockStack[blockStack.length-1].hasElse) {
-        errors.push('Line ' + (i+1) + ': Multiple "else" for same "if"');
-      } else {
-        blockStack[blockStack.length-1].hasElse = true;
+    
+    // Check for missing semicolons - CORRECTED VERSION
+    const origTrimmed = code.split('\n')[lineNum].trim();
+    if(origTrimmed && !origTrimmed.startsWith('//')) {
+      const needsSemicolon = !origTrimmed.endsWith(';') && 
+                             !origTrimmed.endsWith('then') && 
+                             !origTrimmed.endsWith('end') &&
+                             origTrimmed !== 'else' &&
+                             origTrimmed !== 'end' &&
+                             !/^(on|if|elseif)\s/.test(origTrimmed);
+      
+      if(needsSemicolon) {
+        warnings.push('Line ' + (lineNum+1) + ': Missing semicolon');
       }
-    }
-    else if(line === 'end') {
-      if(blockStack.length === 0) {
-        errors.push('Line ' + (i+1) + ': "end" without matching block');
-      } else {
-        blockStack.pop();
-      }
-    }
-    else if(!line.endsWith(';') && !line.endsWith('then')) {
-      warnings.push('Line ' + (i+1) + ': Missing semicolon');
     }
   }
   
