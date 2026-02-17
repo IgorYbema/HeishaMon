@@ -853,6 +853,38 @@ function changeMinWatt(port){
 </script>
 )====";
 
+#ifdef TLS_SUPPORT 
+static const char caUploadJS[] PROGMEM = R"====(
+  <script>
+    (function(){
+      function uploadCA(){
+        var f = document.getElementById('mqtt_ca_cert_file').files[0];
+        var btn = document.getElementById('ca_upload_btn');
+        var st  = document.getElementById('ca_status');
+        if (!f) { st.innerText = 'Please choose a file first.'; return; }
+        btn.disabled = true;
+        st.innerText = 'Uploading...';
+        var fd = new FormData();
+        fd.append('cacert', f, f.name);
+        var xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = function(){
+          if (xhr.readyState === 4) {
+            st.innerText = xhr.responseText || 'No response';
+            btn.disabled = false;
+            if (xhr.status === 200 && /success/i.test(st.innerText)) {
+              if (typeof getSettings === 'function') { getSettings(); }
+            }
+          }
+        };
+        xhr.open('POST', '/cacert');
+        xhr.send(fd);
+      }
+      window.uploadCA = uploadCA;
+    })();
+  </script>;
+)====";
+#endif
+
 static const char webBodySettings1[] FLASHPROG = R"====(
 <script>
 document.addEventListener('DOMContentLoaded',function(){
@@ -939,6 +971,40 @@ static const char settingsForm1[] FLASHPROG = R"====(
       <label class='setting-label'>Password</label>
       <input type='password' name='mqtt_password' maxlength='64' class='setting-input' value=''>
     </div>
+  )===="  
+  
+  #ifdef TLS_SUPPORT
+  R"====(
+<div class='setting-row'>
+  <label class='setting-label'>Use TLS (port 8883)</label>
+  <div class='checkbox-wrap'>
+    <input type='checkbox' id='mqtt_tls_enabled' name='mqtt_tls_enabled' value='enabled'>
+  </div>
+</div>
+
+<div class='setting-row'>
+  <label class='setting-label'>Root CA Certificate (PEM)</label>
+  <div>
+    <div class='file-input-wrap'>
+      <input type='file' id='mqtt_ca_cert_file' accept='.pem,.crt,.cer'
+             onchange="document.getElementById('ca_file_name').innerText=this.files&&this.files[0]?this.files[0].name:'No file selected'">
+    </div>
+    <div id='ca_file_name' style='margin-top:4px;font-size:11px;color:var(--text-muted)'>No file selected</div>
+  </div>
+</div>
+
+<div class='setting-row'>
+  <label class='setting-label'>CA Certificate Actions</label>
+  <div style='display:flex;align-items:center;gap:8px;flex-wrap:wrap'>
+    <button type='button' id='ca_upload_btn' onclick='uploadCA()' class='btn btn-primary'>Upload CA</button>
+    <button type='button' onclick="window.open('/cacert','_blank')" class='btn btn-ghost'>View / Download CA</button>
+    <span id='ca_status' style='font-size:11px;color:var(--text-muted);font-style:italic'>No upload yet</span>
+  </div>
+</div>
+)===="
+#endif
+
+R"====(
   </div></div>
   <div class='panel' style='margin-bottom:16px'>
   <div class='panel-header'><h3>Time</h3></div>
@@ -1165,6 +1231,17 @@ var getSettings=function(){
   req.onreadystatechange=function(){
     if(req.readyState===4&&req.status===200){
       var j=JSON.parse(req.responseText);
+)===="
+#ifdef TLS_SUPPORT
+R"====(
+      if (j.mqtt_ca_cert) {
+        document.getElementById('ca_status').innerText = j.mqtt_ca_cert;
+      } else {
+        document.getElementById('ca_status').innerText = 'Unknown CA status';
+      }
+)===="
+#endif
+R"====(
       for(var k in j){
         var el=document.getElementsByName(k);
         if(el.length>0){
