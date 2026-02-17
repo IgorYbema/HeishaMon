@@ -216,6 +216,9 @@ void loadSettings(settingsStruct *heishamonSettings) {
           if ( jsonDoc["mqtt_password"] ) strlcpy(heishamonSettings->mqtt_password, jsonDoc["mqtt_password"], sizeof(heishamonSettings->mqtt_password));
           if ( jsonDoc["ntp_servers"] ) strlcpy(heishamonSettings->ntp_servers, jsonDoc["ntp_servers"], sizeof(heishamonSettings->ntp_servers));
           if ( jsonDoc["timezone"]) heishamonSettings->timezone = jsonDoc["timezone"];
+#ifdef TLS_SUPPORT
+          heishamonSettings->mqtt_tls_enabled = ( jsonDoc["mqtt_tls_enabled"] == "enabled" ) ? true : false; 
+#endif
           heishamonSettings->force_rules = ( jsonDoc["force_rules"] == "enabled" ) ? true : false;
           heishamonSettings->use_1wire = ( jsonDoc["use_1wire"] == "enabled" ) ? true : false;
           heishamonSettings->use_s0 = ( jsonDoc["use_s0"] == "enabled" ) ? true : false;
@@ -395,6 +398,13 @@ void settingsToJson(JsonDocument &jsonDoc, settingsStruct *heishamonSettings) {
   jsonDoc["mqtt_port"] = heishamonSettings->mqtt_port;
   jsonDoc["mqtt_username"] = heishamonSettings->mqtt_username;
   jsonDoc["mqtt_password"] = heishamonSettings->mqtt_password;
+#ifdef TLS_SUPPORT
+  if (heishamonSettings->mqtt_tls_enabled) {
+    jsonDoc["mqtt_tls_enabled"] = "enabled";
+  } else {
+    jsonDoc["mqtt_tls_enabled"] = "disabled";
+  }
+#endif
   if (heishamonSettings->use_1wire) {
     jsonDoc["use_1wire"] = "enabled";
   } else {
@@ -468,6 +478,90 @@ void saveJsonToFile(JsonDocument &jsonDoc, const char* filename) {
   }
 }
 
+#ifdef TLS_SUPPORT
+static bool processCAtmp_to_CAPEM(String &outMsg) {
+  outMsg = "";
+  File rf = LittleFS.open("/ca.tmp", "r");
+  if (!rf) {
+    outMsg = "Could not open /ca.tmp for reading";
+    return false;
+  }
+
+  size_t sz = rf.size();
+  if (sz == 0) {
+    outMsg = "Upload is empty";
+    rf.close();
+    return false;
+  }
+
+  if (sz > 6144) {
+    outMsg = "Uploaded file too large (>6kB)";
+    rf.close();
+    return false;
+  }
+
+  std::string s;
+  s.resize(sz);
+  size_t n = rf.readBytes(&s[0], sz);
+  rf.close();
+  s.resize(n);
+
+  // BEGIN/END check
+  const char *BEGIN_TAG = "-----BEGIN CERTIFICATE-----";
+  const char *END_TAG   = "-----END CERTIFICATE-----";
+  size_t b = s.find(BEGIN_TAG);
+  size_t e = s.find(END_TAG);
+
+  if (b == std::string::npos || e == std::string::npos) {
+    outMsg = "Uploaded certificate missing BEGIN/END";
+    return false;
+  }
+  e += strlen(END_TAG);
+
+
+  std::string cert = s.substr(b, e - b);
+  if (!cert.empty() && cert.back() != '\n') cert.push_back('\n');
+
+  if (cert.size() > 4096) {
+    outMsg = "Certificate too large (>4kB)";
+    log_message(_F("[WARN] Certificate >4kB – discarding."));
+    return false;
+  }
+
+  // Character check (PEM/Base64 + CR/LF/Space)
+  for (char c : cert) {
+    unsigned char uc = (unsigned char)c;
+    if (!(isalnum(uc) || c=='+'||c=='/'||c=='='||c=='\n'||c=='\r'||c==' '||c=='-')) {
+      outMsg = "Certificate contains invalid characters";
+      log_message(_F("[ERROR] Invalid character in certificate"));
+      return false;
+    }
+  }
+
+  File wf = LittleFS.open("/ca.pem.new", "w");
+  if (!wf) {
+    outMsg = "Could not open /ca.pem.new for writing";
+    return false;
+  }
+  size_t w = wf.write((const uint8_t*)cert.data(), cert.size());
+  wf.close();
+  if (w != cert.size()) {
+    outMsg = "Write to /ca.pem.new incomplete";
+    log_message(_F("[ERROR] Failed to write complete certificate to /ca.pem.new."));
+    LittleFS.remove("/ca.pem.new");
+    return false;
+  }
+
+  LittleFS.remove("/ca.pem");
+  LittleFS.rename("/ca.pem.new", "/ca.pem");
+  LittleFS.remove("/ca.tmp");
+
+  log_message(_F("[INFO] CA certificate stored as /ca.pem"));
+  outMsg = "CA certificate stored in filesystem";
+  return true;
+}
+#endif
+
 int saveSettings(struct webserver_t *client, settingsStruct *heishamonSettings) {
   const char *wifi_ssid = NULL;
   const char *wifi_password = NULL;
@@ -512,6 +606,10 @@ int saveSettings(struct webserver_t *client, settingsStruct *heishamonSettings) 
       jsonDoc["mqtt_password"] = tmp->value;
     } else if (strcmp(tmp->name.c_str(), "use_1wire") == 0) {
       jsonDoc["use_1wire"] = tmp->value;
+#ifdef TLS_SUPPORT
+    } else if (strcmp(tmp->name.c_str(), "mqtt_tls_enabled") == 0) {
+    jsonDoc["mqtt_tls_enabled"] = tmp->value;
+#endif
     } else if (strcmp(tmp->name.c_str(), "use_s0") == 0) {
       jsonDoc["use_s0"] = tmp->value;
       if (strcmp(tmp->value.c_str(), "enabled") == 0) {
@@ -852,6 +950,26 @@ int getSettingsOld(struct webserver_t *client, settingsStruct *heishamonSettings
         itoa(heishamonSettings->proxy, str, 10);
         webserver_send_content(client, str, strlen(str));
 #endif      
+#ifdef TLS_SUPPORT
+        webserver_send_content_P(client, PSTR(",\"mqtt_tls_enabled\":"), 20); 
+        itoa(heishamonSettings->mqtt_tls_enabled, str, 10);
+        webserver_send_content(client, str, strlen(str));
+        webserver_send_content_P(client, PSTR(",\"mqtt_ca_cert\":\""), 17);
+        if (LittleFS.exists("/ca.pem")) {
+            webserver_send_content_P(
+              client,
+              PSTR("CA certificate stored in filesystem"),
+              strlen_P(PSTR("CA certificate stored in filesystem"))
+            );
+          } else {
+            webserver_send_content_P(
+              client,
+              PSTR("No CA certificate found"),
+              strlen_P(PSTR("No CA certificate found"))
+            );
+          }
+        webserver_send_content_P(client, PSTR("\""), 1);
+#endif
         webserver_send_content_P(client, PSTR(",\"use_1wire\":"), 13);
         itoa(heishamonSettings->use_1wire, str, 10);
         webserver_send_content(client, str, strlen(str));
@@ -967,6 +1085,9 @@ int handleSettings(struct webserver_t *client) {
     webserver_send_content_P(client, settingsForm2, strlen_P(settingsForm2));
     webserver_send_content_P(client, menuJS, strlen_P(menuJS));
     webserver_send_content_P(client, settingsJS, strlen_P(settingsJS));
+#ifdef TLS_SUPPORT
+    webserver_send_content_P(client, caUploadJS, strlen_P(caUploadJS));
+#endif
     webserver_send_content_P(client, populategetsettingsJS, strlen_P(populategetsettingsJS));
   } else if (client->content == 3) {
     webserver_send_content_P(client, populatescanwifiJS, strlen_P(populatescanwifiJS));
@@ -976,6 +1097,35 @@ int handleSettings(struct webserver_t *client) {
 
   return 0;
 }
+
+#ifdef TLS_SUPPORT
+int handleCACert(struct webserver_t *client) {
+  static String s_resp; 
+  if (client->content == 0) {
+    String msg;
+    bool ok = processCAtmp_to_CAPEM(msg); 
+    
+    if (ok) {
+      s_resp = "CA upload success: " + msg;
+    } else {
+      s_resp = "CA upload failed: " + msg;
+    }
+
+    webserver_send(client, 200, (char*)"text/plain", s_resp.length());
+    return 0;
+  }
+
+  if (client->content == 1) {
+    if (s_resp.length() > 0) {
+      webserver_send_content(client, (char*)s_resp.c_str(), s_resp.length());
+    }
+    s_resp = "";
+    return 0;
+  }
+
+  return 0;
+}
+#endif
 
 int handleWifiScan(struct webserver_t *client) {
 #if defined(ESP32) 
@@ -1369,6 +1519,32 @@ int showFirmware(struct webserver_t *client) {
 
   return 0;
 }
+
+#ifdef TLS_SUPPORT
+int showCACert(struct webserver_t *client) {
+  if (client->content == 0) {
+    webserver_send(client, 200, (char*)"text/plain", 0);
+    if (!LittleFS.exists("/ca.pem")) {
+      webserver_send_content_P(client, PSTR("No CA certificate uploaded yet\n"), 31);
+      return 0;
+    }
+    File f = LittleFS.open("/ca.pem", "r");
+    if (!f) {
+      webserver_send_content_P(client, PSTR("Failed to open /ca.pem\n"), 24);
+      return 0;
+    }
+    char buf[256];
+    while (f.available()) {
+      size_t n = f.readBytes(buf, sizeof(buf));
+      if (n > 0) {
+        webserver_send_content(client, buf, n);
+      }
+    }
+    f.close();
+  }
+  return 0;
+}
+#endif
 
 int showFirmwareSuccess(struct webserver_t *client) {
   if (client->content == 0) {

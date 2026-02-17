@@ -20,6 +20,12 @@
 
 #define HEATPUMP_VALUE_LEN    16
 
+#if defined(ESP32)
+  #ifndef TLS_SUPPORT
+    #define TLS_SUPPORT 1
+  #endif
+#endif
+
 void log_message(char* string);
 
 static IPAddress apIP(192, 168, 4, 1);
@@ -44,6 +50,9 @@ struct settingsStruct {
   char mqtt_password[65];
   char mqtt_topic_base[128] = "panasonic_heat_pump";
   char ntp_servers[254] = "pool.ntp.org";
+#ifdef TLS_SUPPORT
+  bool mqtt_tls_enabled = false;
+#endif
 
   bool force_rules = false; //force rules on boot, even after a crash
   bool listenonly = false; //listen only so heishamon can be installed parallel to cz-taw1, set commands will not work though
@@ -98,3 +107,7 @@ int showRules(struct webserver_t *client);
 int showFirmware(struct webserver_t *client);
 int showFirmwareSuccess(struct webserver_t *client);
 int showFirmwareFail(struct webserver_t *client);
+#ifdef TLS_SUPPORT 
+int handleCACert(struct webserver_t *client);
+int showCACert(struct webserver_t *client);
+#endif
