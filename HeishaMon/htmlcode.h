@@ -727,8 +727,13 @@ static const char webBodyRoot2[] FLASHPROG = R"====(
 <div class='statusbar' id='statusBar'>
   <div class='status-chip'><span class='status-dot'></span><span class='chip-label'>WiFi</span><span class='chip-value' id='wifi'>—</span><span style='color:var(--text-muted);font-size:11px'>%</span></div>
   <div class='status-chip'><span class='chip-label'>Memory</span><span class='chip-value' id='memory'>—</span><span style='color:var(--text-muted);font-size:11px'>%</span></div>
+)===="
+#ifdef ESP32
+R"====(
   <div class='status-chip'><span class='chip-label'>Ethernet</span><span class='chip-value' id='ethernet'>—</span></div>
-  <div class='status-chip'><span class='chip-label'>Memory</span><span class='chip-value' id='memory'>—</span><span style='color:var(--text-muted);font-size:11px'>%</span></div>
+)===="
+#endif
+R"====(
   <div class='status-chip'><span class='chip-label'>Correct</span><span class='chip-value' id='correct'>—</span><span style='color:var(--text-muted);font-size:11px'>%</span></div>
   <div class='status-chip'><span class='chip-label'>MQTT reconnects</span><span class='chip-value' id='mqtt'>—</span></div>
   <div class='status-chip'><span class='chip-label'>Uptime</span><span class='chip-value' id='uptime'>—</span></div>
@@ -745,18 +750,6 @@ static const char webBodyRootStatusListenOnly[] FLASHPROG = R"====(
   bar.appendChild(chip);
 });</script>
 )====";
-
-static const char webBodyRootStatusWifi[] FLASHPROG = "<!--";
-#ifdef ESP8266
-static const char webBodyRootStatusMemory[] FLASHPROG = "--><!--";
-#else
-static const char webBodyRootStatusEthernet[] FLASHPROG = "--><!--";
-static const char webBodyRootStatusMemory[] FLASHPROG = "--><!--";
-#endif
-static const char webBodyRootStatusReceived[] FLASHPROG = "--><!--";
-static const char webBodyRootStatusReconnects[] FLASHPROG = "--><!--";
-static const char webBodyRootStatusUptime[] FLASHPROG = "--><!--";
-static const char webBodyRootStatusEndSpan[] FLASHPROG = "-->";
 
 // Tab navigation bar
 static const char webTabnavOpen[] FLASHPROG = R"====(

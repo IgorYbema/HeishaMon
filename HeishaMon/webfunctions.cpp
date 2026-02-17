@@ -1058,76 +1058,33 @@ int handleRoot(struct webserver_t *client, float readpercentage, int mqttReconne
           webserver_send_content_P(client, webBodyRootOpenthermTab, strlen_P(webBodyRootOpenthermTab));
         }
         webserver_send_content_P(client, webTabnavClose, strlen_P(webTabnavClose));
-      } break;
-    case 2: {
-        webserver_send_content_P(client, webBodyEndDiv, strlen_P(webBodyEndDiv));
-        webserver_send_content_P(client, webBodyRootStatusWifi, strlen_P(webBodyRootStatusWifi));
-        char str[200];
-        itoa(getWifiQuality(), str, 10);
-        webserver_send_content(client, (char *)str, strlen(str));
-#ifdef ESP32
-        webserver_send_content_P(client, webBodyRootStatusEthernet, strlen_P(webBodyRootStatusEthernet));
-        if (ETH.phyAddr() != 0) {        
-          if (ETH.connected()) {
-            if (ETH.hasIP()) {
-              webserver_send_content_P(client, PSTR("connected - IP: "), 16);
-              char ipaddress[30];
-              ETH.localIP().toString().toCharArray(ipaddress,30);
-              webserver_send_content(client, ipaddress, strlen(ipaddress));              
-              
-            } else {
-              webserver_send_content_P(client, PSTR("connected - no IP"), 17);
-            }
-          } 
-          else {
-            webserver_send_content_P(client, PSTR("not connected"), 13);
-          }
-        } else {
-          webserver_send_content_P(client, PSTR("not installed"), 13);
-        }
-#endif
-      } break;
-    case 3: {
-        webserver_send_content_P(client, webBodyRootStatusMemory, strlen_P(webBodyRootStatusMemory));
-        char str[200];
-        itoa(getFreeMemory(), str, 10);
-        webserver_send_content(client, (char *)str, strlen(str));
-        webserver_send_content_P(client, webBodyRootStatusReceived, strlen_P(webBodyRootStatusReceived));
-        str[200];
-        itoa(readpercentage, str, 10);
-        webserver_send_content(client, (char *)str, strlen(str));
-      } break;
-    case 4: {
-        webserver_send_content_P(client, webBodyRootStatusReconnects, strlen_P(webBodyRootStatusReconnects));
-        char str[200];
-        itoa(mqttReconnects, str, 10);
-        webserver_send_content(client, (char *)str, strlen(str));
-        webserver_send_content_P(client, webBodyRootStatusUptime, strlen_P(webBodyRootStatusUptime));
-        char *up = getUptime();
-        webserver_send_content(client, up, strlen(up));
-        free(up);
-        webserver_send_content_P(client, webBodyRootStatusEndSpan, strlen_P(webBodyRootStatusEndSpan));
         if (heishamonSettings->listenonly) {
           webserver_send_content_P(client, webBodyRootStatusListenOnly, strlen_P(webBodyRootStatusListenOnly));
         }
-      } break;
-    case 5: {
         webserver_send_content_P(client, webBodyEndDiv, strlen_P(webBodyEndDiv));
+      } break;
+    case 2: {
         webserver_send_content_P(client, webBodyRootHeatpumpValues, strlen_P(webBodyRootHeatpumpValues));
         if (heishamonSettings->use_1wire) {
           webserver_send_content_P(client, webBodyRootDallasValues, strlen_P(webBodyRootDallasValues));
         }
+        if (heishamonSettings->opentherm) {
+          webserver_send_content_P(client, webBodyRootOpenthermValues, strlen_P(webBodyRootOpenthermValues));
+        }        
         if (heishamonSettings->use_s0) {
           webserver_send_content_P(client, webBodyRootS0Values, strlen_P(webBodyRootS0Values));
         }
-        if (heishamonSettings->opentherm) {
-          webserver_send_content_P(client, webBodyRootOpenthermValues, strlen_P(webBodyRootOpenthermValues));
-        }
+      } break;
+    case 3: {
         webserver_send_content_P(client, webBodyRootConsole, strlen_P(webBodyRootConsole));
+      } break;
+    case 4: {
         webserver_send_content_P(client, menuJS, strlen_P(menuJS));
       } break;
-    case 6: {
+    case 5: {
         webserver_send_content_P(client, refreshJS, strlen_P(refreshJS));
+      } break;
+    case 6: {
         webserver_send_content_P(client, selectJS, strlen_P(selectJS));
         webserver_send_content_P(client, websocketJS, strlen_P(websocketJS));
         webserver_send_content_P(client, webFooter, strlen_P(webFooter));
