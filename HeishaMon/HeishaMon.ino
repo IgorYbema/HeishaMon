@@ -413,6 +413,34 @@ bool loadTlsCaFromFS(WiFiClientSecure &client) {
 #endif
 
 
+#ifdef TLS_SUPPORT
+bool loadTlsCaFromFS(WiFiClientSecure &client) {
+  if (!LittleFS.exists("/ca.pem")) {
+    log_message(_F("[TLS] /ca.pem not found"));
+    return false;
+  }
+  File certFile = LittleFS.open("/ca.pem", "r");
+  if (!certFile) {
+    log_message(_F("[TLS] open(/ca.pem) failed"));
+    return false;
+  }
+  size_t certSize = certFile.size();
+  if (certSize == 0) {
+    log_message(_F("[TLS] /ca.pem is empty"));
+    certFile.close();
+    return false;
+  }
+  persistent_ca_pem.reset(new char[certSize + 1]);
+  size_t n = certFile.readBytes(persistent_ca_pem.get(), certSize);
+  persistent_ca_pem[n] = '\0';
+  certFile.close();
+  client.setCACert(persistent_ca_pem.get());
+  log_message(_F("[TLS] CA loaded into client"));
+  return true;
+}
+#endif
+
+
 void mqtt_reconnect()
 {
   unsigned long now = millis();
