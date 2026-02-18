@@ -1004,6 +1004,8 @@ int handleRoot(struct webserver_t *client, float readpercentage, int mqttReconne
       } break;
     case 5: {
         webserver_send_content_P(client, refreshJS, strlen_P(refreshJS));
+        webserver_send_content_P(client, consoleTogglesJS, strlen_P(consoleTogglesJS));
+
       } break;
     case 6: {
         webserver_send_content_P(client, selectJS, strlen_P(selectJS));

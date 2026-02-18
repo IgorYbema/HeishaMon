@@ -267,6 +267,29 @@ tbody td:first-child{color:var(--text-primary);font-family:'JetBrains Mono',mono
 }
 .console-opts label{display:flex;align-items:center;gap:6px;cursor:pointer}
 .console-opts input[type=checkbox]{accent-color:var(--accent)}
+.console-toggle-item {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:10px 14px;
+  background:var(--bg-surface);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+}
+.console-toggle-label {
+  font-size:13px;
+  color:var(--text-secondary);
+  font-weight:400;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-width:120px;
+}
+.console-toggle-label .nav-icon {
+  width:16px;
+  text-align:center;
+  opacity:0.7;
+}
 .alias-edit{
   outline:none;
   border:1px solid transparent;
@@ -956,6 +979,115 @@ function buildRow(item,idKey){
 </script>
 )====";
 
+static const char consoleTogglesJS[] FLASHPROG = R"====(
+<script>
+// Session cookie helpers
+function setSessionCookie(name, value) {
+  document.cookie = name + "=" + value + "; path=/; SameSite=Strict";
+}
+
+function getSessionCookie(name) {
+  var nameEQ = name + "=";
+  var ca = document.cookie.split(';');
+  for(var i = 0; i < ca.length; i++) {
+    var c = ca[i];
+    while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+    if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+  }
+  return null;
+}
+
+// Initialize console toggles from session cookies or fetch from server
+function initConsoleToggles() {
+  var mqttLogState = getSessionCookie('mqttLog');
+  var hexdumpState = getSessionCookie('hexdump');
+  
+  if (mqttLogState !== null && hexdumpState !== null) {
+    // Use cached session state
+    document.getElementById('mqttLogToggle').checked = (mqttLogState === 'true');
+    document.getElementById('hexdumpToggle').checked = (hexdumpState === 'true');
+  } else {
+    // First visit in session - fetch from server
+    fetch('/getsettings')
+      .then(function(response) { return response.json(); })
+      .then(function(data) {
+        var mqttEnabled = (data.logMqtt === 'enabled' || data.logMqtt === 1);
+        var hexdumpEnabled = (data.logHexdump === 'enabled' || data.logHexdump === 1);
+        
+        document.getElementById('mqttLogToggle').checked = mqttEnabled;
+        document.getElementById('hexdumpToggle').checked = hexdumpEnabled;
+        
+        // Store in session cookies
+        setSessionCookie('mqttLog', mqttEnabled);
+        setSessionCookie('hexdump', hexdumpEnabled);
+      })
+      .catch(function(err) {
+        console.error('Failed to fetch settings:', err);
+      });
+  }
+}
+
+// Toggle MQTT log
+function toggleMqttLog() {
+  var toggle = document.getElementById('mqttLogToggle');
+  var enabled = toggle.checked;
+  
+  // Update session cookie
+  setSessionCookie('mqttLog', enabled);
+  
+  // Call server endpoint
+  fetch('/togglelog')
+    .then(function(response) {
+      if (!response.ok) {
+        console.error('Failed to toggle MQTT log');
+        // Revert toggle on error
+        toggle.checked = !enabled;
+        setSessionCookie('mqttLog', !enabled);
+      }
+    })
+    .catch(function(err) {
+      console.error('Error toggling MQTT log:', err);
+      // Revert toggle on error
+      toggle.checked = !enabled;
+      setSessionCookie('mqttLog', !enabled);
+    });
+}
+
+// Toggle Hexdump log
+function toggleHexdump() {
+  var toggle = document.getElementById('hexdumpToggle');
+  var enabled = toggle.checked;
+  
+  // Update session cookie
+  setSessionCookie('hexdump', enabled);
+  
+  // Call server endpoint
+  fetch('/togglehexdump')
+    .then(function(response) {
+      if (!response.ok) {
+        console.error('Failed to toggle hexdump');
+        // Revert toggle on error
+        toggle.checked = !enabled;
+        setSessionCookie('hexdump', !enabled);
+      }
+    })
+    .catch(function(err) {
+      console.error('Error toggling hexdump:', err);
+      // Revert toggle on error
+      toggle.checked = !enabled;
+      setSessionCookie('hexdump', !enabled);
+    });
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+  if (document.getElementById('mqttLogToggle')) {
+    initConsoleToggles();
+  }
+});
+</script>
+)====";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ROOT PAGE BODY FRAGMENTS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -973,8 +1105,6 @@ document.addEventListener('DOMContentLoaded',function(){
 <a href="/firmware"><span class="nav-icon">&#8679;</span> Firmware</a>
 <a href="/settings"><span class="nav-icon">&#9881;</span> Settings</a>
 <a href="/rules"><span class="nav-icon">&#8881;</span> Rules</a>
-<a href="/togglelog"><span class="nav-icon">&#128196;</span> Toggle MQTT log</a>
-<a href="/togglehexdump"><span class="nav-icon">&#128202;</span> Toggle Hexdump log</a>
 `;
   document.getElementById('sideVersion').textContent=`v
 )====";
@@ -1087,6 +1217,28 @@ static const char webBodyRootConsole[] FLASHPROG = R"====(
 <div class='panel'>
   <div class='panel-header'><h3>Console Output</h3><span class='panel-meta'>WebSocket</span></div>
   <div style='padding:16px'>
+    <div style='display:flex;gap:24px;margin-bottom:12px;flex-wrap:wrap'>
+      <div class='console-toggle-item'>
+        <label class='console-toggle-label'>
+          <span class='nav-icon'>&#128196;</span>
+          MQTT Log
+        </label>
+        <label class='theme-switch'>
+          <input type='checkbox' id='mqttLogToggle' onchange='toggleMqttLog()'>
+          <span class='theme-slider'></span>
+        </label>
+      </div>
+      <div class='console-toggle-item'>
+        <label class='console-toggle-label'>
+          <span class='nav-icon'>&#128202;</span>
+          Hexdump Log
+        </label>
+        <label class='theme-switch'>
+          <input type='checkbox' id='hexdumpToggle' onchange='toggleHexdump()'>
+          <span class='theme-slider'></span>
+        </label>
+      </div>
+    </div>
     <textarea id='cli' disabled></textarea>
     <div class='console-opts'>
       <label><input type='checkbox' id='autoscroll' checked> Autoscroll</label>
@@ -1155,8 +1307,6 @@ document.addEventListener('DOMContentLoaded',function(){
 <a href="/reboot"><span class="nav-icon">&#8635;</span> Reboot</a>
 <a href="/firmware"><span class="nav-icon">&#8679;</span> Firmware</a>
 <a href="/rules"><span class="nav-icon">&#8881;</span> Rules</a>
-<a href="/togglelog"><span class="nav-icon">&#128196;</span> Toggle MQTT log</a>
-<a href="/togglehexdump"><span class="nav-icon">&#128202;</span> Toggle Hexdump log</a>
 `;
 });
 </script>
@@ -1577,8 +1727,6 @@ document.addEventListener('DOMContentLoaded',function(){
 <a href="/reboot"><span class="nav-icon">&#8635;</span> Reboot</a>
 <a href="/firmware"><span class="nav-icon">&#8679;</span> Firmware</a>
 <a href="/settings"><span class="nav-icon">&#9881;</span> Settings</a>
-<a href="/togglelog"><span class="nav-icon">&#128196;</span> Toggle MQTT log</a>
-<a href="/togglehexdump"><span class="nav-icon">&#128202;</span> Toggle Hexdump log</a>
 `;
 });
 </script>
@@ -1999,8 +2147,6 @@ document.addEventListener('DOMContentLoaded',function(){
 <a href="/"><span class="nav-icon">&#8634;</span> Home</a>
 <a href="/reboot"><span class="nav-icon">&#8635;</span> Reboot</a>
 <a href="/settings"><span class="nav-icon">&#9881;</span> Settings</a>
-<a href="/togglelog"><span class="nav-icon">&#128196;</span> Toggle MQTT log</a>
-<a href="/togglehexdump"><span class="nav-icon">&#128202;</span> Toggle Hexdump log</a>
 `;
 });
 </script>
