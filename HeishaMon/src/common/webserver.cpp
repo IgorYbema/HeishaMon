@@ -1846,7 +1846,7 @@ err_t webserver_sent(void *arg, tcp_pcb *pcb, uint16_t len) {
 static void send_websocket_handshake(struct webserver_t *client, const char *key) {
   char cpy[61] = { 0 };
   char input[20] = { 0 };
-  char encoded[20] = { 0 };
+  char encoded[32] = { 0 };
 
   const char *magic = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
