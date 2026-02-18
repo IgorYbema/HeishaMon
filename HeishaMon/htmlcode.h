@@ -10,7 +10,37 @@
 static const char webCSS[] FLASHPROG = R"====(
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap');
+
+/* ═══════════════════════════════════════════════════════════════════════
+   LIGHT MODE (DEFAULT)
+   ═══════════════════════════════════════════════════════════════════════ */
 :root {
+  --bg-base:#f8f9fa;
+  --bg-surface:#ffffff;
+  --bg-elevated:#f1f3f5;
+  --bg-hover:#e9ecef;
+  --border:#dee2e6;
+  --border-focus:#3a7bd5;
+  --text-primary:#212529;
+  --text-secondary:#495057;
+  --text-muted:#6c757d;
+  --accent:#3a7bd5;
+  --accent-glow:rgba(58,123,213,0.15);
+  --accent-hover:#5a9be8;
+  --red:#dc3545;
+  --red-glow:rgba(220,53,69,0.15);
+  --green:#28a745;
+  --green-glow:rgba(40,167,69,0.15);
+  --orange:#fd7e14;
+  --radius:8px;
+  --radius-sm:5px;
+  --radius-lg:12px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   DARK MODE
+   ═══════════════════════════════════════════════════════════════════════ */
+html.dark-mode {
   --bg-base:#0f1117;
   --bg-surface:#161922;
   --bg-elevated:#1e2230;
@@ -28,10 +58,11 @@ static const char webCSS[] FLASHPROG = R"====(
   --green:#2ecc94;
   --green-glow:rgba(46,204,148,0.2);
   --orange:#f0a500;
-  --radius:8px;
-  --radius-sm:5px;
-  --radius-lg:12px;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   BASE STYLES (remain unchanged)
+   ═══════════════════════════════════════════════════════════════════════ */
 *{box-sizing:border-box;margin:0;padding:0}
 html{font-size:15px;-webkit-text-size-adjust:100%}
 body{
@@ -41,7 +72,9 @@ body{
   min-height:100vh;
   line-height:1.5;
   overflow-x:hidden;
+  transition:background 0.3s, color 0.3s;
 }
+
 .topbar{
   display:flex;
   align-items:center;
@@ -419,8 +452,95 @@ select#wifi_ssid_select{
   border-radius:var(--radius-sm);
   max-width:320px;width:100%;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   DARK MODE TOGGLE SWITCH
+   ═══════════════════════════════════════════════════════════════════════ */
+.theme-toggle {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:12px 12px;
+  margin:8px 12px;
+  background:var(--bg-elevated);
+  border-radius:var(--radius);
+  border:1px solid var(--border);
+}
+.theme-toggle-label {
+  font-size:13px;
+  color:var(--text-secondary);
+  font-weight:400;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.theme-toggle-label .nav-icon {
+  width:16px;
+  text-align:center;
+  opacity:0.7;
+}
+.theme-switch {
+  position:relative;
+  width:44px;
+  height:24px;
+}
+.theme-switch input {
+  opacity:0;
+  width:0;
+  height:0;
+}
+.theme-slider {
+  position:absolute;
+  cursor:pointer;
+  top:0;
+  left:0;
+  right:0;
+  bottom:0;
+  background:var(--border);
+  transition:0.3s;
+  border-radius:24px;
+}
+.theme-slider:before {
+  position:absolute;
+  content:"";
+  height:18px;
+  width:18px;
+  left:3px;
+  bottom:3px;
+  background:white;
+  transition:0.3s;
+  border-radius:50%;
+}
+input:checked + .theme-slider {
+  background:var(--accent);
+}
+input:checked + .theme-slider:before {
+  transform:translateX(20px);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   DARK MODE SPECIFIC OVERRIDES
+   ═══════════════════════════════════════════════════════════════════════ */
+html.dark-mode #cli {
+  background:#0a0c0f;
+  color:#6ee7b7;
+}
+
+html.dark-mode .rules-editor {
+  background:#0f1117;
+  color:#e4e7eb;
+  border-color:#2d3748;
+}
+
+html.dark-mode .line-numbers {
+  background:#0a0c10;
+  color:#4a5568;
+  border-color:#2d3748;
+}
+
 </style>
 )====";
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HTML HEAD
@@ -432,6 +552,75 @@ static const char webHeader[] FLASHPROG = R"====(
 <meta charset='utf-8'>
 <meta name='viewport' content='width=device-width, initial-scale=1'>
 <title>Heisha Monitor</title>
+<script>
+(function(){
+  function getCookie(name){
+    var nameEQ=name+"=";
+    var ca=document.cookie.split(';');
+    for(var i=0;i<ca.length;i++){
+      var c=ca[i];
+      while(c.charAt(0)==' ')c=c.substring(1,c.length);
+      if(c.indexOf(nameEQ)==0)return c.substring(nameEQ.length,c.length);
+    }
+    return null;
+  }
+  if(getCookie('darkMode')==='true'){
+    document.documentElement.classList.add('dark-mode-loading');
+  }
+})();
+</script>
+<style>
+html.dark-mode-loading {
+  background:#0f1117 !important;
+  color:#eef0f4 !important;
+}
+html.dark-mode-loading body {
+  background:#0f1117 !important;
+  color:#eef0f4 !important;
+  transition:none !important;
+}
+html.dark-mode-loading .topbar,
+html.dark-mode-loading .panel,
+html.dark-mode-loading .sidemenu,
+html.dark-mode-loading .status-chip,
+html.dark-mode-loading .msg-box {
+  background:#161922 !important;
+  border-color:#2a3040 !important;
+}
+html.dark-mode-loading .theme-toggle {
+  background:#1e2230 !important;
+  border-color:#2a3040 !important;
+}
+html.dark-mode-loading .tabnav {
+  background:#0f1117 !important;
+}
+html.dark-mode-loading .setting-input,
+html.dark-mode-loading input[type=text],
+html.dark-mode-loading input[type=number],
+html.dark-mode-loading input[type=password],
+html.dark-mode-loading select {
+  background:#0f1117 !important;
+  color:#eef0f4 !important;
+  border-color:#2a3040 !important;
+}
+html.dark-mode-loading thead th {
+  background:#0f1117 !important;
+  color:#7b8597 !important;
+  border-color:#2a3040 !important;
+}
+html.dark-mode-loading progress {
+  background:#1e2230 !important;
+}
+html.dark-mode-loading progress::-webkit-progress-bar {
+  background:#1e2230 !important;
+}
+html.dark-mode-loading progress::-webkit-progress-value {
+  background:#3a7bd5 !important;
+}
+html.dark-mode-loading .panel-header {
+  border-color:#2a3040 !important;
+}
+</style>
 )====";
 
 static const char refreshMeta[] FLASHPROG = R"====(
@@ -450,6 +639,19 @@ static const char webBodyStart[] FLASHPROG = R"====(
     <h2>HeishaMon</h2>
     <p id='sideVersion'></p>
   </div>
+  
+  <!-- DARK MODE TOGGLE -->
+  <div class='theme-toggle'>
+    <label class='theme-toggle-label'>
+      <span class='nav-icon'>☀</span>
+      Dark Mode
+    </label>
+    <label class='theme-switch'>
+      <input type='checkbox' id='darkModeToggle' onchange='toggleDarkMode()'>
+      <span class='theme-slider'></span>
+    </label>
+  </div>
+  
   <nav class='sidemenu-nav' id='sideNav'></nav>
   <div class='sidemenu-footer'>
     <a href='https://github.com/Egyras/HeishaMon' target='_blank'>GitHub</a>
@@ -480,6 +682,65 @@ function toggleMenu(){
 function closeMenu(){
   document.getElementById('sideMenu').classList.remove('open');
   document.getElementById('menuOverlay').classList.remove('open');
+}
+
+function setCookie(name, value, days) {
+  var expires = "";
+  if (days) {
+    var date = new Date();
+    date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+    expires = "; expires=" + date.toUTCString();
+  }
+  document.cookie = name + "=" + (value || "") + expires + "; path=/";
+}
+
+function getCookie(name) {
+  var nameEQ = name + "=";
+  var ca = document.cookie.split(';');
+  for(var i = 0; i < ca.length; i++) {
+    var c = ca[i];
+    while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+    if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+  }
+  return null;
+}
+
+function toggleDarkMode() {
+  var toggle = document.getElementById('darkModeToggle');
+  var html = document.documentElement;
+  
+  if (toggle.checked) {
+    html.classList.add('dark-mode');
+    setCookie('darkMode', 'true', 365);
+  } else {
+    html.classList.remove('dark-mode');
+    setCookie('darkMode', 'false', 365);
+  }
+}
+
+function initDarkMode() {
+  var darkMode = getCookie('darkMode');
+  var toggle = document.getElementById('darkModeToggle');
+  var html = document.documentElement;
+  
+  // Remove the temporary loading class
+  html.classList.remove('dark-mode-loading');
+  
+  // Apply proper dark mode
+  if (darkMode === 'true') {
+    html.classList.add('dark-mode');
+    if (toggle) toggle.checked = true;
+  } else {
+    html.classList.remove('dark-mode');
+    if (toggle) toggle.checked = false;
+  }
+}
+
+// Initialize immediately when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initDarkMode);
+} else {
+  initDarkMode();
 }
 </script>
 )====";
