@@ -823,6 +823,9 @@ int getSettings(struct webserver_t *client, settingsStruct *heishamonSettings) {
     case 0: {
         JsonDocument jsonDoc;
         settingsToJson(jsonDoc, heishamonSettings); //stores current settings in a json document  
+#ifdef TLS_SUPPORT
+        jsonDoc["mqtt_ca_cert"] = LittleFS.exists("/ca.pem") ? "CA certificate stored in filesystem" : "No CA certificate found";
+#endif   
         int size = measureJson(jsonDoc);
         char* buffer = (char*)malloc(size+1);
         if (buffer == nullptr) {
@@ -830,9 +833,6 @@ int getSettings(struct webserver_t *client, settingsStruct *heishamonSettings) {
             log_message(_F("Failed to initialize buffer for getsettings serialize json"));
             return -1;
         }
-#ifdef TLS_SUPPORT
-        jsonDoc["mqtt_ca_cert"] = LittleFS.exists("/ca.pem") ? "CA certificate stored in filesystem" : "No CA certificate found";
-#endif        
         serializeJson(jsonDoc, buffer, size);
         webserver_send(client, 200, (char *)"application/json", 0);
         webserver_send_content(client, buffer, size);
