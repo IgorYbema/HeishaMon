@@ -398,6 +398,8 @@ void settingsToJson(JsonDocument &jsonDoc, settingsStruct *heishamonSettings) {
   jsonDoc["mqtt_port"] = heishamonSettings->mqtt_port;
   jsonDoc["mqtt_username"] = heishamonSettings->mqtt_username;
   jsonDoc["mqtt_password"] = heishamonSettings->mqtt_password;
+  jsonDoc["ntp_servers"] = heishamonSettings->ntp_servers;
+  jsonDoc["timezone"] = heishamonSettings->timezone;
 #ifdef TLS_SUPPORT
   if (heishamonSettings->mqtt_tls_enabled) {
     jsonDoc["mqtt_tls_enabled"] = "enabled";
@@ -466,6 +468,14 @@ void settingsToJson(JsonDocument &jsonDoc, settingsStruct *heishamonSettings) {
   jsonDoc["dallasResolution"] = heishamonSettings->dallasResolution;
   jsonDoc["updateAllTime"] = heishamonSettings->updateAllTime;
   jsonDoc["updataAllDallasTime"] = heishamonSettings->updataAllDallasTime;
+  jsonDoc["s0_1_ppkwh"] = heishamonSettings->s0Settings[0].ppkwh;
+  jsonDoc["s0_1_interval"] = heishamonSettings->s0Settings[0].lowerPowerInterval;
+  jsonDoc["s0_1_minpulsewidth"] = heishamonSettings->s0Settings[0].minimalPulseWidth;
+  jsonDoc["s0_1_maxpulsewidth"] = heishamonSettings->s0Settings[0].maximalPulseWidth;
+  jsonDoc["s0_2_ppkwh"] = heishamonSettings->s0Settings[1].ppkwh;
+  jsonDoc["s0_2_interval"] = heishamonSettings->s0Settings[1].lowerPowerInterval;
+  jsonDoc["s0_2_minpulsewidth"] = heishamonSettings->s0Settings[1].minimalPulseWidth;
+  jsonDoc["s0_2_maxpulsewidth"] = heishamonSettings->s0Settings[1].maximalPulseWidth;  
 }
 
 void saveJsonToFile(JsonDocument &jsonDoc, const char* filename) {
@@ -567,7 +577,6 @@ int saveSettings(struct webserver_t *client, settingsStruct *heishamonSettings) 
   const char *wifi_password = NULL;
   const char *new_ota_password = NULL;
   const char *current_ota_password = NULL;
-  const char *use_s0 = NULL;
 
   bool reconnectWiFi = false;
   bool wrongPassword = false;
@@ -612,9 +621,6 @@ int saveSettings(struct webserver_t *client, settingsStruct *heishamonSettings) 
 #endif
     } else if (strcmp(tmp->name.c_str(), "use_s0") == 0) {
       jsonDoc["use_s0"] = tmp->value;
-      if (strcmp(tmp->value.c_str(), "enabled") == 0) {
-        use_s0 = tmp->value.c_str();
-      }
     } else if (strcmp(tmp->name.c_str(), "hotspot") == 0) {
       jsonDoc["hotspot"] = tmp->value;
     } else if (strcmp(tmp->name.c_str(), "listenonly") == 0) {
@@ -657,34 +663,23 @@ int saveSettings(struct webserver_t *client, settingsStruct *heishamonSettings) 
       new_ota_password = tmp->value.c_str();
     } else if (strcmp(tmp->name.c_str(), "current_ota_password") == 0) {
       current_ota_password = tmp->value.c_str();
-    }
-    tmp = tmp->next;
-  }
-
-  tmp = (struct websettings_t *)client->userdata;
-  while (tmp) {
-    //if (use_s0 != NULL && strcmp(tmp->name.c_str(), "s0_1_gpio") == 0) {
-    // jsonDoc["s0_1_gpio"] = tmp->value;
-    //} else
-    if (use_s0 != NULL && strcmp(tmp->name.c_str(), "s0_1_ppkwh") == 0) {
+    } else if (strcmp(tmp->name.c_str(), "s0_1_ppkwh") == 0) {
       jsonDoc["s0_1_ppkwh"] = tmp->value;
-    } else if (use_s0 != NULL && strcmp(tmp->name.c_str(), "s0_1_interval") == 0) {
+    } else if (strcmp(tmp->name.c_str(), "s0_1_interval") == 0) {
       jsonDoc["s0_1_interval"] = tmp->value;
-    } else if (use_s0 != NULL && strcmp(tmp->name.c_str(), "s0_1_minpulsewidth") == 0) {
+    } else if (strcmp(tmp->name.c_str(), "s0_1_minpulsewidth") == 0) {
       jsonDoc["s0_1_minpulsewidth"] = tmp->value;
-    } else if (use_s0 != NULL && strcmp(tmp->name.c_str(), "s0_1_maxpulsewidth") == 0) {
+    } else if (strcmp(tmp->name.c_str(), "s0_1_maxpulsewidth") == 0) {
       jsonDoc["s0_1_maxpulsewidth"] = tmp->value;
-    //} else if (use_s0 != NULL && strcmp(tmp->name.c_str(), "s0_2_gpio") == 0) {
-    //  jsonDoc["s0_2_gpio"] = tmp->value;
-    } else if (use_s0 != NULL && strcmp(tmp->name.c_str(), "s0_2_ppkwh") == 0) {
+    } else if (strcmp(tmp->name.c_str(), "s0_2_ppkwh") == 0) {
       jsonDoc["s0_2_ppkwh"] = tmp->value;
-    } else if (use_s0 != NULL && strcmp(tmp->name.c_str(), "s0_2_ppkwh") == 0) {
+    } else if (strcmp(tmp->name.c_str(), "s0_2_ppkwh") == 0) {
       jsonDoc["s0_2_ppkwh"] = tmp->value;
-    } else if (use_s0 != NULL && strcmp(tmp->name.c_str(), "s0_2_interval") == 0) {
+    } else if (strcmp(tmp->name.c_str(), "s0_2_interval") == 0) {
       jsonDoc["s0_2_interval"] = tmp->value;
-    } else if (use_s0 != NULL && strcmp(tmp->name.c_str(), "s0_2_minpulsewidth") == 0) {
+    } else if (strcmp(tmp->name.c_str(), "s0_2_minpulsewidth") == 0) {
       jsonDoc["s0_2_minpulsewidth"] = tmp->value;
-    } else if (use_s0 != NULL && strcmp(tmp->name.c_str(), "s0_2_maxpulsewidth") == 0) {
+    } else if (strcmp(tmp->name.c_str(), "s0_2_maxpulsewidth") == 0) {
       jsonDoc["s0_2_maxpulsewidth"] = tmp->value;
     }
     tmp = tmp->next;

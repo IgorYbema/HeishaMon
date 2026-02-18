@@ -1246,7 +1246,7 @@ R"====(
         var el=document.getElementsByName(k);
         if(el.length>0){
           if(['text','number','password'].indexOf(el[0].type)>-1){el[0].value=j[k];}
-          if(el[0].type=='checkbox'&&j[k]==1){
+          if(el[0].type=='checkbox'&&(j[k] === 'enabled' || j[k] === 1)){
             el[0].checked=true;
             if(k.indexOf('1wire')>-1)ShowHideDallasTable(el[0]);
             if(k.indexOf('s0')>-1)ShowHideS0Table(el[0]);

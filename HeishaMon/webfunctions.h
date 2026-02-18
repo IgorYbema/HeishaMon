@@ -97,6 +97,8 @@ void settingsToJson(JsonDocument  &jsonDoc, settingsStruct *heishamonSettings);
 void saveJsonToFile(JsonDocument  &jsonDoc, const char *filename);
 void loadSettings(settingsStruct *heishamonSettings);
 int getSettings(struct webserver_t *client, settingsStruct *heishamonSettings);
+int getSettingsJson(struct webserver_t *client, settingsStruct *heishamonSettings);
+
 int handleSettings(struct webserver_t *client);
 int saveSettings(struct webserver_t *client, settingsStruct *heishamonSettings);
 int settingsReconnectWifi(struct webserver_t *client, settingsStruct *heishamonSettings);
