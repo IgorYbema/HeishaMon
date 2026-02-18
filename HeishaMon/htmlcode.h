@@ -382,7 +382,7 @@ select.setting-input{appearance:auto}
   color:var(--red);
   margin-top:20px;line-height:1.6;
 }
-.firmware-warning strong{color:#fff}
+.firmware-warning strong{color:var(--text-primary)}
 progress{
   width:100%;height:6px;
   appearance:none;
