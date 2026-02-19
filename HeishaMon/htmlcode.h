@@ -873,7 +873,25 @@ function startWebsockets(){
 }
 function updStat(id,val){
   var el=document.getElementById(id);
-  if(el)el.textContent=val!=null?val:'';
+  if(el){
+    // Special handling for WiFi disconnected state
+    if(id === 'wifi' && (val === -1 || val === '-1' || parseInt(val) < 0)){
+      el.textContent = 'not connected';
+      // Remove the % symbol that follows
+      var percentSpan = el.nextElementSibling;
+      if(percentSpan && percentSpan.textContent === '%'){
+        percentSpan.style.display = 'none';
+      }
+    } else {
+      el.textContent = val != null ? val : '';
+      // Show % symbol again if it was hidden
+      var percentSpan = el.nextElementSibling;
+      if(percentSpan && percentSpan.textContent === '%'){
+        percentSpan.style.display = '';
+      }
+    }
+  }
+  
   if ((el) && (id == 'wifi') && (val!==undefined)){
     var w=parseInt(val);
     var label=el.previousElementSibling;
@@ -888,6 +906,7 @@ function updStat(id,val){
     }
   }
 }
+
 function updCell(id,val){
   var el=document.getElementById(id);
   if(el&&el.textContent!==val){
