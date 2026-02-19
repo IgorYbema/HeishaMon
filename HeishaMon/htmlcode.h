@@ -247,7 +247,6 @@ tbody td:first-child{color:var(--text-primary);font-family:'JetBrains Mono',mono
 }
 #cli{
   width:100%;
-  height:420px;
   background:#0a0c0f;
   color:#6ee7b7;
   border:1px solid var(--border);
@@ -255,41 +254,68 @@ tbody td:first-child{color:var(--text-primary);font-family:'JetBrains Mono',mono
   padding:14px 16px;
   font-family:'JetBrains Mono',monospace;
   font-size:11.5px;
-  resize:vertical;
+  resize:none;  /* Changed from vertical to none since we're auto-sizing */
   outline:none;
   line-height:1.6;
 }
+
 #cli:focus{border-color:var(--border-focus);box-shadow:0 0 0 3px var(--accent-glow)}
-.console-opts{
-  display:flex;align-items:center;gap:12px;
-  margin-top:10px;
-  font-size:12px;color:var(--text-muted);
-}
-.console-opts label{display:flex;align-items:center;gap:6px;cursor:pointer}
-.console-opts input[type=checkbox]{accent-color:var(--accent)}
-.console-toggle-item {
+
+.console-toggle-compact {
   display:flex;
   align-items:center;
-  gap:12px;
-  padding:10px 14px;
-  background:var(--bg-surface);
-  border:1px solid var(--border);
-  border-radius:var(--radius);
+  gap:6px;
 }
-.console-toggle-label {
-  font-size:13px;
-  color:var(--text-secondary);
+.console-toggle-label-compact {
+  font-size:11px;
+  color:var(--text-muted);
   font-weight:400;
-  display:flex;
-  align-items:center;
-  gap:8px;
-  min-width:120px;
+  text-transform:uppercase;
+  letter-spacing:0.3px;
 }
-.console-toggle-label .nav-icon {
-  width:16px;
-  text-align:center;
-  opacity:0.7;
+.theme-switch-compact {
+  position:relative;
+  width:32px;
+  height:18px;
 }
+.theme-switch-compact input {
+  opacity:0;
+  width:0;
+  height:0;
+}
+.theme-slider-compact {
+  position:absolute;
+  cursor:pointer;
+  top:0;
+  left:0;
+  right:0;
+  bottom:0;
+  background:var(--border);
+  transition:0.3s;
+  border-radius:18px;
+}
+.theme-slider-compact:before {
+  position:absolute;
+  content:"";
+  height:14px;
+  width:14px;
+  left:2px;
+  bottom:2px;
+  background:white;
+  transition:0.3s;
+  border-radius:50%;
+}
+input:checked + .theme-slider-compact {
+  background:var(--accent);
+}
+input:checked + .theme-slider-compact:before {
+  transform:translateX(14px);
+}
+input:disabled + .theme-slider-compact {
+  opacity:0.4;
+  cursor:not-allowed;
+}
+
 .alias-edit{
   outline:none;
   border:1px solid transparent;
@@ -463,6 +489,14 @@ progress::-webkit-progress-value{background:var(--accent);border-radius:3px;tran
   .main-content{padding:16px 12px 32px}
   .topbar{padding:0 12px}
   thead th,tbody td{padding:8px 10px;font-size:11.5px}
+  .panel-header {
+    flex-direction:column;
+    align-items:flex-start;
+    gap:8px;
+  }
+  .panel-header > div {
+    flex-wrap:wrap;
+  }  
 }
 select#wifi_ssid_select{
   display:none;
@@ -540,6 +574,8 @@ input:checked + .theme-slider {
 input:checked + .theme-slider:before {
   transform:translateX(20px);
 }
+
+
 
 /* ═══════════════════════════════════════════════════════════════════════
    DARK MODE SPECIFIC OVERRIDES
@@ -1214,35 +1250,35 @@ static const char webBodyRootOpenthermValues[] FLASHPROG = R"====(
 
 static const char webBodyRootConsole[] FLASHPROG = R"====(
 <div id='Console' class='tab-pane'>
-<div class='panel'>
-  <div class='panel-header'><h3>Console Output</h3><span class='panel-meta'>WebSocket</span></div>
-  <div style='padding:16px'>
-    <div style='display:flex;gap:24px;margin-bottom:12px;flex-wrap:wrap'>
-      <div class='console-toggle-item'>
-        <label class='console-toggle-label'>
-          <span class='nav-icon'>&#128196;</span>
-          MQTT Log
-        </label>
-        <label class='theme-switch'>
+<div class='panel' style='display:flex;flex-direction:column;height:calc(100vh - 180px)'>
+  <div class='panel-header'>
+    <h3>Console Output</h3>
+    <div style='display:flex;gap:16px;align-items:center'>
+      <div class='console-toggle-compact'>
+        <span class='console-toggle-label-compact'>Log to MQTT</span>
+        <label class='theme-switch-compact'>
           <input type='checkbox' id='mqttLogToggle' onchange='toggleMqttLog()'>
-          <span class='theme-slider'></span>
+          <span class='theme-slider-compact'></span>
         </label>
       </div>
-      <div class='console-toggle-item'>
-        <label class='console-toggle-label'>
-          <span class='nav-icon'>&#128202;</span>
-          Hexdump Log
-        </label>
-        <label class='theme-switch'>
+      <div class='console-toggle-compact'>
+        <span class='console-toggle-label-compact'>Hexdump</span>
+        <label class='theme-switch-compact'>
           <input type='checkbox' id='hexdumpToggle' onchange='toggleHexdump()'>
-          <span class='theme-slider'></span>
+          <span class='theme-slider-compact'></span>
+        </label>
+      </div>
+      <div class='console-toggle-compact'>
+        <span class='console-toggle-label-compact'>Autoscroll</span>
+        <label class='theme-switch-compact'>
+          <input type='checkbox' id='autoscroll' checked>
+          <span class='theme-slider-compact'></span>
         </label>
       </div>
     </div>
-    <textarea id='cli' disabled></textarea>
-    <div class='console-opts'>
-      <label><input type='checkbox' id='autoscroll' checked> Autoscroll</label>
-    </div>
+  </div>
+  <div style='flex:1;padding:16px;display:flex;flex-direction:column'>
+    <textarea id='cli' disabled style='flex:1;height:auto;min-height:300px'></textarea>
   </div>
 </div></div>
 )====";
@@ -1732,13 +1768,11 @@ document.addEventListener('DOMContentLoaded',function(){
 </script>
   <div style='display:flex;'>
     <div id='line-numbers' class='line-numbers'></div>
-    <div id='rules' contenteditable='true' spellcheck='false' class='rules-editor'>
-)====";
+    <div id='rules' contenteditable='true' spellcheck='false' class='rules-editor'>)====";
 
 
 
-static const char showRulesPage2[] FLASHPROG = R"====(
-</div>
+static const char showRulesPage2[] FLASHPROG = R"====(</div>
   </div>
   <div style='margin-top:12px;'>
     <button type='button' onclick='validateRules()' style='background:#3a7bd5;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;margin-right:8px;'>Validate</button>
@@ -1757,7 +1791,7 @@ function highlightRules() {
   const editor = document.getElementById('rules');
   const cursorPos = saveCursorPosition(editor);
   
-  let text = editor.textContent;
+  let text = editor.textContent.trim();
   let html = '';
   let i = 0;
   
@@ -2043,22 +2077,34 @@ function validateRules() {
 
 function saveRules() {
   const editor = document.getElementById('rules');
-  const form = document.createElement('form');
-  form.method = 'POST';
-  form.action = '/saverules';
+  const rulesText = editor.textContent.trim();
   
-  const input = document.createElement('textarea');
-  input.name = 'rules';
-  input.value = editor.textContent;
-  form.appendChild(input);
-  
-  document.body.appendChild(form);
-  form.submit();
+  // Use fetch with explicit body control
+  fetch('/saverules', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: 'rules=' + encodeURIComponent(rulesText)
+  })
+  .then(function(response) {
+    if (response.ok) {
+      // Reload the page to show saved rules
+      window.location.href = '/rules';
+    } else {
+      alert('Failed to save rules');
+    }
+  })
+  .catch(function(err) {
+    console.error('Error saving rules:', err);
+    alert('Error saving rules');
+  });
 }
 
 document.addEventListener('DOMContentLoaded', function() {
   const editor = document.getElementById('rules');
   if(editor) {
+    editor.textContent = editor.textContent.trim();
     editor.addEventListener('keydown', function(e) {
       if(e.key === 'Enter') {
         e.preventDefault();
