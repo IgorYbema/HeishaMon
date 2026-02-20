@@ -96,7 +96,7 @@ void initS0Sensors(s0SettingsStruct s0Settings[]) {
 
 void restore_s0_Watthour(int s0Port, float watthour) {
   if ((s0Port == 1) || (s0Port == 2)) {
-    unsigned int newTotal = int(watthour * (actS0Settings[s0Port - 1].ppkwh / 1000.0));
+    unsigned long newTotal = (unsigned long)(watthour * (actS0Settings[s0Port - 1].ppkwh / 1000.0));
     if (newTotal > actS0Data[s0Port - 1].pulsesTotal) {
       noInterrupts();
       actS0Data[s0Port - 1].pulsesTotal = newTotal;
