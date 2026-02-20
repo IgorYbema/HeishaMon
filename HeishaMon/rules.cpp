@@ -321,7 +321,7 @@ static int8_t is_event(char *text, uint16_t size) {
     return 24;
   }
 
-  uint8_t nr = rule_by_name(rules, nrrules, text);
+  int8_t nr = rule_by_name(rules, nrrules, text);
   if(nr >= 0) {
     return size;
   }
@@ -660,7 +660,7 @@ static int8_t vm_value_set(struct rules_t *obj) {
               heishaOTDataStruct[x].value.f = (float)rules_tointeger(-1);
             } break;
             case VFLOAT: {
-              heishaOTDataStruct[x].value.f = rules_tointeger(-1);
+              heishaOTDataStruct[x].value.f = rules_tofloat(-1);
             } break;
           }
         }
@@ -964,7 +964,7 @@ int rules_parse(char *file) {
 void rules_event_cb(const char *prefix, const char *name) {
   uint8_t len = strlen(name), len1 = strlen(prefix), tlen = 0;
   char buf[100] = { '\0' };
-  snprintf_P((char *)&buf, 100, PSTR("%s%s"), prefix, name);
+  snprintf_P((char *)&buf, sizeof(buf), PSTR("%s%s"), prefix, name);
   int8_t nr = rule_by_name(rules, nrrules, (char *)buf);
   if(nr > -1) {
     logprintf_P(F("%s %s %s"), F("===="), name, F("===="));
