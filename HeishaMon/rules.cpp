@@ -322,7 +322,7 @@ static int8_t is_event(char *text, uint16_t size) {
   }
 
   uint8_t nr = rule_by_name(rules, nrrules, text);
-  if(nr > 0) {
+  if(nr >= 0) {
     return size;
   }
 

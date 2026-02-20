@@ -1810,7 +1810,7 @@ function highlightRules() {
   const editor = document.getElementById('rules');
   const cursorPos = saveCursorPosition(editor);
   
-  let text = editor.textContent.trim();
+  let text = editor.textContent;
   let html = '';
   let i = 0;
   
