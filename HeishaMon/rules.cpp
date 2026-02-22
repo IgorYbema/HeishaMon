@@ -226,6 +226,7 @@ static int8_t is_variable(char *text, uint16_t size) {
   return -1;
 }
 
+
 static int8_t is_event(char *text, uint16_t size) {
   int i = 1, x = 0, match = 0;
   if(text[0] == '@') {
@@ -321,9 +322,15 @@ static int8_t is_event(char *text, uint16_t size) {
     return 24;
   }
 
-  int8_t nr = rule_by_name(rules, nrrules, text);
-  if(nr >= 0) {
-    return size;
+// Custom event. Make sure it is in a valid format
+  if(isalpha(text[0]) || text[0] == '_') {
+    uint16_t i = 0;
+    while(i < size && (isalnum(text[i]) || text[i] == '_' || text[i] == '#')) {
+      i++;
+    }
+    if(i == size) {
+      return size;  // Valid identifier - accept it
+    }
   }
 
   return -1;
@@ -338,7 +345,7 @@ static int8_t event_cb(struct rules_t *obj, char *name) {
   if(nr == -1) {
     char msg[100];
     sprintf_P((char *)&msg, PSTR("Rule block '%s' not found"), name);
-    log_message(name);
+    log_message(msg);
     return -1;
   }
 
