@@ -193,6 +193,10 @@ body{
 .status-chip .chip-value{color:var(--text-primary);font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500}
 .status-chip.listen-only{border-color:var(--orange);background:rgba(240,165,0,.08)}
 .status-chip.listen-only .chip-value{color:var(--orange)}
+.status-chip.rules-active {background:linear-gradient(135deg,rgba(33,150,243,0.08),rgba(33,150,243,0.12));border-color:rgba(33,150,243,0.2);}
+.status-chip.rules-active .chip-value {color:#2196F3;font-weight:600;}
+.status-chip.rules-inactive {background:linear-gradient(135deg,rgba(158,158,158,0.05),rgba(158,158,158,0.08));border-color:rgba(158,158,158,0.15);}
+.status-chip.rules-inactive .chip-value {color:#9e9e9e;font-weight:500;}
 .status-dot{width:8px;height:8px;border-radius:50%;margin-right:8px;transition:background 0.3s;}
 .status-dot.excellent{background:#2ecc94;}
 .status-dot.good{background:#3a7bd5;}
@@ -848,6 +852,7 @@ function startWebsockets(){
             updStat('correct',j.data.stats.correct);
             updStat('mqtt',j.data.stats.mqtt);
             updStat('uptime',j.data.stats.uptime);
+            updStat('rules',j.data.stats.rules);
           } else if(j.data.heishavalues){
             updCell(j.data.heishavalues.topic+'-Value',j.data.heishavalues.value);
             updCell(j.data.heishavalues.topic+'-Description',j.data.heishavalues.description);
@@ -904,6 +909,22 @@ function updStat(id,val){
       else if(w>=25)dot.classList.add('fair');
       else dot.classList.add('poor');
     }
+  }
+
+  if (id === 'rules') {
+    var chip = document.getElementById('rulesChip');
+    if (chip) {
+      var count = parseInt(val);
+      var valueEl = chip.querySelector('.chip-value');
+      if (count > 0) {
+        chip.className = 'status-chip rules-active';
+        valueEl.textContent = 'ACTIVE';
+      } else {
+        chip.className = 'status-chip rules-inactive';
+        valueEl.textContent = 'INACTIVE';
+      }
+    }
+    return;
   }
 }
 
@@ -1183,6 +1204,7 @@ R"====(
   <div class='status-chip'><span class='chip-label'>Correct</span><span class='chip-value' id='correct'>—</span><span style='color:var(--text-muted);font-size:11px'>%</span></div>
   <div class='status-chip'><span class='chip-label'>MQTT reconnects</span><span class='chip-value' id='mqtt'>—</span></div>
   <div class='status-chip'><span class='chip-label'>Uptime</span><span class='chip-value' id='uptime'>—</span></div>
+  <div class='status-chip rules-inactive' id='rulesChip'><span class='chip-label'>Rules</span><span class='chip-value' id='rules_value'>—</span></div>
 </div>
 )====";
 
@@ -1796,6 +1818,7 @@ static const char showRulesPage2[] FLASHPROG = R"====(</div>
   <div style='margin-top:12px;'>
     <button type='button' onclick='validateRules()' style='background:#3a7bd5;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;margin-right:8px;'>Validate</button>
     <button type='button' onclick='saveRules()' style='background:#2ecc94;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;'>Save Rules</button>
+    <button type='button' onclick="clearRules()" style='background:#f44336;color:white;border:none;padding:10px 20px;border-radius:6px;cursor:pointer;'>Erase Rules</button>
   </div>
   <div id='validation-result'></div>
 )====";
@@ -2118,6 +2141,33 @@ function saveRules() {
     console.error('Error saving rules:', err);
     alert('Error saving rules');
   });
+}
+
+function clearRules() {
+  if(confirm('Are you sure you want to clear all rules? This cannot be undone.')) {
+    const editor = document.getElementById('rules');
+    editor.textContent = '';
+    
+    // Save the empty rules
+    const formData = new FormData();
+    formData.append('rules', '');
+    
+    fetch('/saverules', {
+      method: 'POST',
+      body: formData
+    })
+    .then(function(response) {
+      if (response.ok) {
+        window.location.href = '/rules';
+      } else {
+        alert('Failed to clear rules');
+      }
+    })
+    .catch(function(err) {
+      console.error('Error clearing rules:', err);
+      alert('Error clearing rules');
+    });
+  }
 }
 
 document.addEventListener('DOMContentLoaded', function() {
