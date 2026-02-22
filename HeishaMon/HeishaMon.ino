@@ -1651,10 +1651,6 @@ void setup() {
   setupETH();
 #endif
 
-//  loggingSerial.println(F("Setup MQTT..."));
-//  setupMqtt();
-//shifted - TLS requires correct time
-
   loggingSerial.println(F("Setup HTTP..."));
   setupHttp();
 
@@ -1843,7 +1839,7 @@ void loop() {
   #endif
     {
       if (mqttReconnects > 0 ) log_message(_F("Lost MQTT connection!"));
-      mqtt_reconnect();
+      if (strlen(heishamonSettings.mqtt_server) > 0) mqtt_reconnect();
     }
 
 
