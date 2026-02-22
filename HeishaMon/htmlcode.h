@@ -1156,10 +1156,10 @@ static const char webBodyRoot1[] FLASHPROG = R"====(
 document.addEventListener('DOMContentLoaded',function(){
   var nav=document.getElementById('sideNav');
   nav.innerHTML=`
-<a href="/reboot"><span class="nav-icon">&#8635;</span> Reboot</a>
 <a href="/firmware"><span class="nav-icon">&#8679;</span> Firmware</a>
-<a href="/settings"><span class="nav-icon">&#9881;</span> Settings</a>
+<a href="/reboot"><span class="nav-icon">&#8635;</span> Reboot</a>
 <a href="/rules"><span class="nav-icon">&#8881;</span> Rules</a>
+<a href="/settings"><span class="nav-icon">&#9881;</span> Settings</a>
 `;
   document.getElementById('sideVersion').textContent=`v
 )====";
@@ -1359,8 +1359,8 @@ document.addEventListener('DOMContentLoaded',function(){
   var nav=document.getElementById('sideNav');
   nav.innerHTML=`
 <a href="/"><span class="nav-icon">&#8634;</span> Home</a>
-<a href="/reboot"><span class="nav-icon">&#8635;</span> Reboot</a>
 <a href="/firmware"><span class="nav-icon">&#8679;</span> Firmware</a>
+<a href="/reboot"><span class="nav-icon">&#8635;</span> Reboot</a>
 <a href="/rules"><span class="nav-icon">&#8881;</span> Rules</a>
 `;
 });
@@ -1779,8 +1779,8 @@ document.addEventListener('DOMContentLoaded',function(){
   var nav=document.getElementById('sideNav');
   nav.innerHTML=`
 <a href="/"><span class="nav-icon">&#8634;</span> Home</a>
-<a href="/reboot"><span class="nav-icon">&#8635;</span> Reboot</a>
 <a href="/firmware"><span class="nav-icon">&#8679;</span> Firmware</a>
+<a href="/reboot"><span class="nav-icon">&#8635;</span> Reboot</a>
 <a href="/settings"><span class="nav-icon">&#9881;</span> Settings</a>
 `;
 });
@@ -2211,6 +2211,7 @@ document.addEventListener('DOMContentLoaded',function(){
   nav.innerHTML=`
 <a href="/"><span class="nav-icon">&#8634;</span> Home</a>
 <a href="/reboot"><span class="nav-icon">&#8635;</span> Reboot</a>
+<a href="/rules"><span class="nav-icon">&#8881;</span> Rules</a>
 <a href="/settings"><span class="nav-icon">&#9881;</span> Settings</a>
 `;
 });
