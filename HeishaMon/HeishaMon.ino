@@ -822,11 +822,10 @@ void serialTXTask(void *pvParameters) {
   for (;;) {
     unsigned long now = millis();
 
-    // highest priority: optional PCB query every second
-    if ((!sending) && ((unsigned long)(now - lastPCBSendTime) >= OPTIONALPCBQUERYTIME)) {
+    // highest priority: optional PCB query every second, no sending flag as it should always send despite of other tasks sending also
+    if ((unsigned long)(now - lastPCBSendTime) >= OPTIONALPCBQUERYTIME) {
       lastPCBSendTime = now;
       if (heishamonSettings.optionalPCB && !heishamonSettings.listenonly) {
-        sending = true;
         sendCommandReadTime = now;
         xQueuePeek(pcbQueue, localPCBQuery, 0);
         byte chk = calcChecksum(localPCBQuery, OPTIONALPCBQUERYSIZE);
