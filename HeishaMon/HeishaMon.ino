@@ -704,8 +704,10 @@ bool readSerial()
   if (data_length > 3) { //should have received length part of header now
 
     if (((data[0] != 0x71) && (data[0] != 0x31)) || (data[2] != 0x01))  { //wrong header received!
-      //log_message(_F("Received bad header. Ignoring this data!"));
-      //if (heishamonSettings.logHexdump) logHex(data, len);
+      if (heishamonSettings.logHexdump) {
+        log_message(_F("Received bad header. Ignoring this data!"));
+        logHex(data, len);
+      }
       badheaderread++;
       data_length = 0;
       return false;
