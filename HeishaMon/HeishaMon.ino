@@ -61,7 +61,7 @@ settingsStruct heishamonSettings;
 
 uint32_t neoPixelState = 0; //running neoPixelState
 bool inSetup; //bool to check if still booting
-bool sending = false; // mutex for sending data
+volatile bool sending = false; // mutex for sending data
 bool mqttcallbackinprogress = false; // mutex for processing mqtt callback
 
 bool extraDataBlockAvailable = false; // this will be set to true if, during boot, heishamon detects this heatpump has extra data block (like K and L series do)
@@ -81,7 +81,7 @@ unsigned long lastRunTime = 0;
 unsigned long lastOptionalPCBRunTime = 0;
 unsigned long lastOptionalPCBSave = 0;
 #endif
-unsigned long sendCommandReadTime = 0; //set to millis value during send, allow to wait millis for answer
+volatile unsigned long sendCommandReadTime = 0; //set to millis value during send, allow to wait millis for answer
 
 unsigned long goodreads = 0;
 unsigned long totalreads = 0;
@@ -820,9 +820,11 @@ void serialTXTask(void *pvParameters) {
     unsigned long now = millis();
 
     // highest priority: optional PCB query every second
-    if ((unsigned long)(now - lastPCBSendTime) >= OPTIONALPCBQUERYTIME) {
+    if ((!sending) && ((unsigned long)(now - lastPCBSendTime) >= OPTIONALPCBQUERYTIME)) {
       lastPCBSendTime = now;
       if (heishamonSettings.optionalPCB && !heishamonSettings.listenonly) {
+        sending = true;
+        sendCommandReadTime = now;
         xQueuePeek(pcbQueue, localPCBQuery, 0);
         byte chk = calcChecksum(localPCBQuery, OPTIONALPCBQUERYSIZE);
         heatpumpSerial.write(localPCBQuery, OPTIONALPCBQUERYSIZE);
@@ -838,8 +840,10 @@ void serialTXTask(void *pvParameters) {
     }
 
     // second priority: static heatpump query every waitTime seconds
-    if (!heishamonSettings.listenonly) {
+    if ((!sending) && (!heishamonSettings.listenonly)) {
       if ((unsigned long)(now - lastHPSendTime) >= (1000 * heishamonSettings.waitTime)) {
+        sending = true;
+        sendCommandReadTime = now;
         lastHPSendTime = now;
         byte chk = calcChecksum(panasonicQuery, PANASONICQUERYSIZE);
         heatpumpSerial.write(panasonicQuery, PANASONICQUERYSIZE);
@@ -857,9 +861,11 @@ void serialTXTask(void *pvParameters) {
     }
 
     // lowest priority: user commands from queue
-    if (!heishamonSettings.listenonly) {
+    if ((!sending) && (!heishamonSettings.listenonly)) {
       struct cmdbuffer_t cmd;
       if (xQueueReceive(cmdQueue, &cmd, 0) == pdTRUE) {
+        sending = true;
+        sendCommandReadTime = now;
         byte chk = calcChecksum(cmd.data, cmd.length);
         heatpumpSerial.write(cmd.data, cmd.length);
         heatpumpSerial.write(chk);
@@ -880,8 +886,6 @@ bool send_command(byte* command, int length) {
   cmd.length = length;
   memcpy(&cmd.data, command, length);
   xQueueSend(cmdQueue, &cmd, 0);
-
-  sendCommandReadTime = millis(); //set sendCommandReadTime when to timeout the answer of this command
   return true;
 }
 
@@ -1864,7 +1868,6 @@ void send_optionalpcb_query() {
 }
 #endif
 
-#ifdef ESP8266
 void readHeatpump() {
   if (sending && ((unsigned long)(millis() - sendCommandReadTime) > SERIALTIMEOUT)) {
     log_message(_F("Previous read data attempt failed due to timeout!"));
@@ -1882,11 +1885,6 @@ void readHeatpump() {
   }
   if ( (heishamonSettings.listenonly || sending) && (heatpumpSerial.available() > 0)) readSerial();
 }
-#else
-void readHeatpump() {
-  if (heatpumpSerial.available() > 0) readSerial();
-}
-#endif
 
 void checkBootButton() {
   if (digitalRead(BOOTPIN)) { //true = 1, not pressed
