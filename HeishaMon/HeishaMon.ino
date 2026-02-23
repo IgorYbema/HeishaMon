@@ -822,10 +822,17 @@ void serialTXTask(void *pvParameters) {
   for (;;) {
     unsigned long now = millis();
 
-    // highest priority: optional PCB query every second, no sending flag as it should always send despite of other tasks sending also
-    if ((unsigned long)(now - lastPCBSendTime) >= OPTIONALPCBQUERYTIME) {
+    if (sending && ((unsigned long)(millis() - sendCommandReadTime) > (SERIALTIMEOUT + OPTIONALPCBQUERYTIME) )) {
+      //clear sending flag if taking too long so the optional pcb can still send regulary
+      //normally the flag would already be cleared by the readserial timeout but if that process hangs (wifi, mqtt issue) this check will free it anyways
+      sending = false;
+    }
+
+    // highest priority: optional PCB query every second
+    if ((!sending) && ((unsigned long)(now - lastPCBSendTime) >= OPTIONALPCBQUERYTIME)) {
       lastPCBSendTime = now;
       if (heishamonSettings.optionalPCB && !heishamonSettings.listenonly) {
+        sending = true;
         sendCommandReadTime = now;
         xQueuePeek(pcbQueue, localPCBQuery, 0);
         byte chk = calcChecksum(localPCBQuery, OPTIONALPCBQUERYSIZE);
