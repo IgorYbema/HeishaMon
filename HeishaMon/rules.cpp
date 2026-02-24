@@ -39,6 +39,9 @@ extern settingsStruct heishamonSettings;
 extern char actData[DATASIZE];
 extern char actOptData[OPTDATASIZE];
 extern char actDataExtra[DATASIZE];
+extern volatile s0DataStruct actS0Data[];
+extern volatile s0SettingsStruct actS0Settings[];
+
 extern String openTherm[2];
 static uint8_t parsing = 0;
 
@@ -117,6 +120,19 @@ static int8_t is_variable(char *text, uint16_t size) {
 
   if(size == strlen_P(PSTR("ds18b20#2800000000000000")) && strncmp_P(text, PSTR("ds18b20#"), 8) == 0) {
     return 24;
+  } else if(strncmp_P(text, PSTR("s0#"), 3) == 0) {
+    if((size == strlen_P(PSTR("s0#watt_1")) && strncmp_P(&text[3], PSTR("watt_"), 5) == 0) ||
+       (size == strlen_P(PSTR("s0#watt_2")) && strncmp_P(&text[3], PSTR("watt_"), 5) == 0)) {
+        return size;
+    }
+    if((size == strlen_P(PSTR("s0#watthour_1")) && strncmp_P(&text[3], PSTR("watthour_"), 9) == 0) ||
+       (size == strlen_P(PSTR("s0#watthour_2")) && strncmp_P(&text[3], PSTR("watthour_"), 9) == 0)) {
+        return size;
+    }
+    if((size == strlen_P(PSTR("s0#watthourtotal_1")) && strncmp_P(&text[3], PSTR("watthourtotal_"), 14) == 0) ||
+       (size == strlen_P(PSTR("s0#watthourtotal_2")) && strncmp_P(&text[3], PSTR("watthourtotal_"), 14) == 0)) {
+        return size;
+    }
   } else if(text[0] == '$' || text[0] == '#' || text[0] == '@' || text[0] == '%' || text[0] == '?') {
     while(isalnum(text[i])) {
       i++;
@@ -322,6 +338,21 @@ static int8_t is_event(char *text, uint16_t size) {
     return 24;
   }
 
+  if(strncmp_P(text, PSTR("s0#"), 3) == 0) {
+    if((size == strlen_P(PSTR("s0#watt_1")) || size == strlen_P(PSTR("s0#watt_2"))) &&
+        strncmp_P(&text[3], PSTR("watt_"), 5) == 0) {
+        return size;
+    }
+    if((size == strlen_P(PSTR("s0#watthour_1")) || size == strlen_P(PSTR("s0#watthour_2"))) &&
+        strncmp_P(&text[3], PSTR("watthour_"), 9) == 0) {
+        return size;
+    }
+    if((size == strlen_P(PSTR("s0#watthourtotal_1")) || size == strlen_P(PSTR("s0#watthourtotal_2"))) &&
+        strncmp_P(&text[3], PSTR("watthourtotal_"), 14) == 0) {
+        return size;
+    }
+  }
+
 // Custom event. Make sure it is in a valid format
   if(isalpha(text[0]) || text[0] == '_') {
     uint16_t i = 0;
@@ -440,6 +471,42 @@ static int8_t vm_value_get(struct rules_t *obj) {
         return 0;
       }
     }
+    rules_pushnil();
+    return 0;
+ } else if(strnicmp((const char *)key, _F("s0#"), 3) == 0) {
+    const char *subkey = &key[3];
+    // Parse port number from the trailing '_1' or '_2'
+    // subkey is like "watt_1", "watthour_2", "watthourtotal_1"
+    const char *underscore = strrchr(subkey, '_');
+    if(underscore == NULL) {
+        rules_pushnil();
+        return 0;
+    }
+    int port = atoi(underscore + 1);  // 1 or 2
+    if(port < 1 || port > NUM_S0_COUNTERS) {
+        rules_pushnil();
+        return 0;
+    }
+    uint8_t idx = port - 1;  // 0-based index
+
+    size_t prefixLen = (size_t)(underscore - subkey);
+
+    if(prefixLen == 4 && strnicmp(subkey, "watt", 4) == 0) {
+        // s0#watt_N — current watt
+        rules_pushfloat((float)actS0Data[idx].watt);
+        return 0;
+    } else if(prefixLen == 8 && strncmp(subkey, "watthour", 8) == 0) {
+        // s0#watthour_N — watt-hours since last report
+        float Watthour = (actS0Data[idx].pulses * ( 1000.0 / actS0Settings[idx].ppkwh));
+        rules_pushfloat(Watthour);
+        return 0;
+    } else if(prefixLen == 13 && strncmp(subkey, "watthourtotal", 13) == 0) {
+        // s0#watthourtotal_N — total watt-hours
+        float WatthourTotal = (actS0Data[idx].pulsesTotal * ( 1000.0 / actS0Settings[idx].ppkwh));
+        rules_pushfloat(WatthourTotal);
+        return 0;
+    }
+
     rules_pushnil();
     return 0;
   } else if(key[0] == '@') {
