@@ -1647,7 +1647,7 @@ static const char settingsForm2[] FLASHPROG = R"====(
   <div class='panel' style='margin-bottom:16px'>
   <div class='panel-header'><h3>Listen Only</h3></div>
   <div class='settings-grid'>
-    <div class='setting-row'><label class='setting-label'>Listen only (parallel CZ-TAW1)</label><div class='checkbox-wrap'><input type='checkbox' name='listenonly' value='enabled'></div></div>
+    <div class='setting-row'><label class='setting-label'>Listen only (CZ-TAW1 is talking)</label><div class='checkbox-wrap'><input type='checkbox' name='listenonly' value='enabled'></div></div>
   </div></div>
   <div class='panel' style='margin-bottom:16px'>
   <div class='panel-header'><h3>1-Wire DS18B20</h3></div>
