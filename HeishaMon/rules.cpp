@@ -338,20 +338,13 @@ static int8_t is_event(char *text, uint16_t size) {
     return 24;
   }
 
-  if(strncmp_P(text, PSTR("s0#"), 3) == 0) {
-    if((size == strlen_P(PSTR("s0#watt_1")) || size == strlen_P(PSTR("s0#watt_2"))) &&
-        strncmp_P(&text[3], PSTR("watt_"), 5) == 0) {
-        return size;
-    }
-    if((size == strlen_P(PSTR("s0#watthour_1")) || size == strlen_P(PSTR("s0#watthour_2"))) &&
-        strncmp_P(&text[3], PSTR("watthour_"), 9) == 0) {
-        return size;
-    }
-    if((size == strlen_P(PSTR("s0#watthourtotal_1")) || size == strlen_P(PSTR("s0#watthourtotal_2"))) &&
-        strncmp_P(&text[3], PSTR("watthourtotal_"), 14) == 0) {
-        return size;
-    }
-  }
+if(strncmp(text, "s0#", 3) == 0 && (size == 9 || size == 13 || size == 18)) {
+    char port = text[size - 1];  // last char is the port digit
+    if(port != '1' && port != '2') return -1;
+    if(size == 9  && strnicmp(&text[3], "watt_", 5) == 0)          return size;
+    if(size == 13 && strnicmp(&text[3], "watthour_", 9) == 0)      return size;
+    if(size == 18 && strnicmp(&text[3], "watthourtotal_", 14) == 0) return size;
+}
 
 // Custom event. Make sure it is in a valid format
   if(isalpha(text[0]) || text[0] == '_') {
@@ -473,40 +466,28 @@ static int8_t vm_value_get(struct rules_t *obj) {
     }
     rules_pushnil();
     return 0;
- } else if(strnicmp((const char *)key, _F("s0#"), 3) == 0) {
-    const char *subkey = &key[3];
-    // Parse port number from the trailing '_1' or '_2'
-    // subkey is like "watt_1", "watthour_2", "watthourtotal_1"
-    const char *underscore = strrchr(subkey, '_');
-    if(underscore == NULL) {
-        rules_pushnil();
-        return 0;
-    }
-    int port = atoi(underscore + 1);  // 1 or 2
-    if(port < 1 || port > NUM_S0_COUNTERS) {
-        rules_pushnil();
-        return 0;
-    }
-    uint8_t idx = port - 1;  // 0-based index
+} else if(strnicmp((const char *)key, "s0#", 3) == 0) {
+    // Port digit is last character; valid sizes are 9, 13, 18
+    size_t klen = strlen(key);
+    if(klen != 9 && klen != 13 && klen != 18) { rules_pushnil(); return 0; }
 
-    size_t prefixLen = (size_t)(underscore - subkey);
+    char portChar = key[klen - 1];
+    if(portChar != '1' && portChar != '2') { rules_pushnil(); return 0; }
+    uint8_t idx = portChar - '1';  // '1'->0, '2'->1
 
-    if(prefixLen == 4 && strnicmp(subkey, "watt", 4) == 0) {
-        // s0#watt_N — current watt
+    if(klen == 9 && strnicmp(&key[3], "watt_", 5) == 0) {
+
         rules_pushfloat((float)actS0Data[idx].watt);
         return 0;
-    } else if(prefixLen == 8 && strncmp(subkey, "watthour", 8) == 0) {
-        // s0#watthour_N — watt-hours since last report
-        float Watthour = (actS0Data[idx].pulses * ( 1000.0 / actS0Settings[idx].ppkwh));
-        rules_pushfloat(Watthour);
-        return 0;
-    } else if(prefixLen == 13 && strncmp(subkey, "watthourtotal", 13) == 0) {
-        // s0#watthourtotal_N — total watt-hours
-        float WatthourTotal = (actS0Data[idx].pulsesTotal * ( 1000.0 / actS0Settings[idx].ppkwh));
-        rules_pushfloat(WatthourTotal);
+    }
+    if(klen == 13 && strnicmp(&key[3], "watthour_", 9) == 0) {
+        rules_pushfloat(actS0Data[idx].pulses * (1000.0 / actS0Settings[idx].ppkwh));
         return 0;
     }
-
+    if(klen == 18 && strnicmp(&key[3], "watthourtotal_", 14) == 0) {
+        rules_pushfloat(actS0Data[idx].pulsesTotal * (1000.0 / actS0Settings[idx].ppkwh));
+        return 0;
+    }
     rules_pushnil();
     return 0;
   } else if(key[0] == '@') {
