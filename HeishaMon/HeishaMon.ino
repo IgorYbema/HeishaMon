@@ -652,8 +652,8 @@ void readProxy()
       }      
       log_message(_F("PROXY Checksum and header received ok!"));
       if ((proxydata[0]==0x71 or proxydata[0]==0xF1) and proxydata_length == (PANASONICQUERYSIZE+1)) { //this is a query from cztaw on proxy port
-        if (proxydata[0]==0xf1) {  //this is a write query, just pass this message forward as new command
-          log_message(_F("PROXY received write query, copy message forward to heatpump"));
+        if ((proxydata[0]==0xf1)  || heishamonSettings.listenonly) {  //this is a write query or we are in write only, just pass this message forward as new command
+          log_message(_F("PROXY received query, copy message forward to heatpump"));
           send_command((byte*)proxydata,proxydata_length-1); //strip CRC, will be calculated again in send_command
           //then just reply with the current settings, for read and write it is the same as the write is only acknowledged in the next read
           //so we just run to the next if statement
@@ -668,23 +668,14 @@ void readProxy()
           if ((actDataExtra[0] == 0x71) && (actDataExtra[1] == 0xc8) && (actDataExtra[2] == 0x01)) { //don't answer if we don't have data
             proxySerial.write(actDataExtra,DATASIZE); //should contain valid checksum also
           }
-        } else {
-          log_message(_F("PROXY has sent unknown query! Forwarding to heatpump!"));
-          send_command((byte *)proxydata, proxydata_length-1); //strip CRC from end as send_command wil recalculate it
         }
         proxydata_length = 0;
         return;
-      } else if (proxydata[0]==0x31) {
-        log_message(_F("PROXY received startup message, forwarding to heatpump!"));
-        send_command((byte *)proxydata, proxydata_length-1); //strip CRC from end as send_command wil recalculate it
-        proxydata_length = 0;
-        return;
-      } else {
-        log_message(_F("PROXY received unknown message, forwarding it to heatpump anyway!"));
-        send_command((byte *)proxydata, proxydata_length-1); //strip CRC from end as send_command wil recalculate it
-        proxydata_length = 0;
-        return;
       }
+      log_message(_F("PROXY received unknown message, forwarding it to heatpump anyway!"));
+      send_command((byte *)proxydata, proxydata_length-1); //strip CRC from end as send_command wil recalculate it
+      proxydata_length = 0;
+      return;
     }
   }
 }
@@ -870,7 +861,7 @@ void serialTXTask(void *pvParameters) {
     }
 
     // lowest priority: user commands from queue
-    if ((!sending) && (!heishamonSettings.listenonly)) {
+    if (!sending) { //do not check for listeonly here as this could be proxyied commands
       struct cmdbuffer_t cmd;
       if (xQueueReceive(cmdQueue, &cmd, 0) == pdTRUE) {
         sending = true;
@@ -887,8 +878,8 @@ void serialTXTask(void *pvParameters) {
   }
 }
 bool send_command(byte* command, int length) {
-  if ( heishamonSettings.listenonly ) {
-    log_message(_F("Not sending this command. Heishamon in listen only mode!"));
+  if ( heishamonSettings.listenonly && (!heishamonSettings.proxy)) {
+    log_message(_F("Not sending this command. Heishamon in listen only mode and not proxying!"));
     return false;
   }
   struct cmdbuffer_t cmd;
@@ -1290,7 +1281,7 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
                 digitalWrite(ENABLEPIN, HIGH);
               }
               #else
-              if (heishamonSettings.listenonly) {
+              if (heishamonSettings.listenonly && !heishamonSettings.proxy) {
                 digitalWrite(ENABLEPIN, LOW);
               } else {
                 digitalWrite(ENABLEPIN, HIGH);
@@ -1565,6 +1556,11 @@ void switchSerial() {
       digitalWrite(ENABLEPIN, HIGH);
     }
   }
+#ifdef ESP32  
+  if (heishamonSettings.listenonly && heishamonSettings.proxy) { //enable serial tx when proxying on large heishamon
+    digitalWrite(ENABLEPIN, HIGH);
+  }
+#endif
 }
 
 void setupMqtt() {
