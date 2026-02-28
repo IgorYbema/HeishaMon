@@ -1155,6 +1155,25 @@ function toggleHexdump() {
     });
 }
 
+function downloadConsole() {
+  var text = document.getElementById('cli').value;
+  if (!text) return;
+  var blob = new Blob([text], { type: 'text/plain' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  var now = new Date();
+  var ts = now.getFullYear()
+    + '-' + String(now.getMonth()+1).padStart(2,'0')
+    + '-' + String(now.getDate()).padStart(2,'0')
+    + '_' + String(now.getHours()).padStart(2,'0')
+    + String(now.getMinutes()).padStart(2,'0')
+    + String(now.getSeconds()).padStart(2,'0');
+  a.href = url;
+  a.download = 'heishamon-console-' + ts + '.txt';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
   if (document.getElementById('mqttLogToggle')) {
@@ -1316,6 +1335,7 @@ static const char webBodyRootConsole[] FLASHPROG = R"====(
           <span class='theme-slider-compact'></span>
         </label>
       </div>
+      <button onclick='downloadConsole()' class='btn btn-ghost' style='padding:4px 10px;font-size:11px;height:24px;'>&#8681; Download</button>
     </div>
   </div>
   <div style='flex:1;padding:16px;display:flex;flex-direction:column'>
