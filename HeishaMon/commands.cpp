@@ -7,6 +7,10 @@ byte panasonicQuery[] = {0x71, 0x6c, 0x01, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0
 byte optionalPCBQuery[] = {0xF1, 0x11, 0x01, 0x50, 0x00, 0x00, 0x40, 0xFF, 0xFF, 0xE5, 0xFF, 0xFF, 0x00, 0xFF, 0xEB, 0xFF, 0xFF, 0x00, 0x00};
 byte panasonicSendQuery[] PROGMEM = {0xf1, 0x6c, 0x01, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 
+#ifdef ESP32
+extern QueueHandle_t pcbQueue;
+#endif
+
 const char* mqtt_topic_values PROGMEM = "main";
 const char* mqtt_topic_xvalues PROGMEM = "extra";
 const char* mqtt_topic_commands PROGMEM = "commands";
@@ -870,6 +874,98 @@ unsigned int set_external_error(char *msg, unsigned char *cmd, char *log_msg){
   return sizeof(panasonicSendQuery);
 }
 
+unsigned int set_heatingcontrol(char *msg, unsigned char *cmd, char *log_msg) {
+
+  const byte address=30;
+  byte value = 0b01;
+
+  if ( String(msg).toInt() == 1 ) {
+    value = 0b10;
+  }
+
+  {
+    char tmp[256] = { 0 };
+    snprintf_P(tmp, 255, PSTR("set heating control %d"), value - 1);
+    memcpy(log_msg, tmp, sizeof(tmp));
+  }
+
+  {
+    memcpy_P(cmd, panasonicSendQuery, sizeof(panasonicSendQuery));
+    cmd[address] = value << 2;
+  }
+
+  return sizeof(panasonicSendQuery);
+}
+
+unsigned int set_smart_dhw(char *msg, unsigned char *cmd, char *log_msg) {
+
+  const byte address=24;
+  byte value = 0b01;
+
+  if ( String(msg).toInt() == 1 ) {
+    value = 0b10;
+  }
+
+  {
+    char tmp[256] = { 0 };
+    snprintf_P(tmp, 255, PSTR("set smart dhw %d"), value - 1);
+    memcpy(log_msg, tmp, sizeof(tmp));
+  }
+
+  {
+    memcpy_P(cmd, panasonicSendQuery, sizeof(panasonicSendQuery));
+    cmd[address] = value << 6;
+  }
+
+  return sizeof(panasonicSendQuery);
+}
+
+unsigned int set_quiet_mode_priority(char *msg, unsigned char *cmd, char *log_msg) {
+
+  const byte address=11;
+  byte value = 0b01;
+
+  if ( String(msg).toInt() == 1 ) {
+    value = 0b10;
+  }
+
+  {
+    char tmp[256] = { 0 };
+    snprintf_P(tmp, 255, PSTR("set quiet mode priority %d"), value - 1);
+    memcpy(log_msg, tmp, sizeof(tmp));
+  }
+
+  {
+    memcpy_P(cmd, panasonicSendQuery, sizeof(panasonicSendQuery));
+    cmd[address] = value << 4;
+  }
+
+  return sizeof(panasonicSendQuery);
+}
+
+unsigned int set_pump_flowrate_mode(char *msg, unsigned char *cmd, char *log_msg) {
+
+  const byte address=29;
+  byte value = 0b01;
+
+  if ( String(msg).toInt() == 1 ) {
+    value = 0b10;
+  }
+
+  {
+    char tmp[256] = { 0 };
+    snprintf_P(tmp, 255, PSTR("set pump flowrate mode %d"), value - 1);
+    memcpy(log_msg, tmp, sizeof(tmp));
+  }
+
+  {
+    memcpy_P(cmd, panasonicSendQuery, sizeof(panasonicSendQuery));
+    cmd[address] = value << 4;
+  }
+
+  return sizeof(panasonicSendQuery);
+}
+
 unsigned int set_external_compressor_control(char *msg, unsigned char *cmd, char *log_msg){
   const byte off_state=64;
   const byte address=23;
@@ -1060,6 +1156,9 @@ void send_heatpump_command(char* topic, char *msg, bool (*send_command)(byte*, i
       if (strcmp(topic, tmp.name) == 0) {
         len = tmp.func(msg, log_msg);
         log_message(log_msg);
+#ifdef ESP32        
+       xQueueOverwrite(pcbQueue, optionalPCBQuery);
+#endif          
       }
     }
   }
