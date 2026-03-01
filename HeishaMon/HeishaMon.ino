@@ -814,6 +814,7 @@ void pushCommandBuffer(byte* command, int length) {
 void serialTXTask(void *pvParameters) {
   unsigned long lastPCBSendTime = 0;
   unsigned long lastHPSendTime = 0;
+  unsigned long lastHPExtraSendTime = 0;
   unsigned long lastPCBSaveTime = 0;
   char local_log_msg[LOG_MSG_SIZE];
 
@@ -857,17 +858,25 @@ void serialTXTask(void *pvParameters) {
         byte chk = calcChecksum(panasonicQuery, PANASONICQUERYSIZE);
         heatpumpSerial.write(panasonicQuery, PANASONICQUERYSIZE);
         heatpumpSerial.write(chk);
-        if (extraDataBlockAvailable) {
-          panasonicQuery[3] = 0x21;
-          chk = calcChecksum(panasonicQuery, PANASONICQUERYSIZE);
-          heatpumpSerial.write(panasonicQuery, PANASONICQUERYSIZE);
-          heatpumpSerial.write(chk);
-          panasonicQuery[3] = 0x10;
-        }
-        sprintf_P(local_log_msg, PSTR("heatpump request datagram sent bytes: %d"), PANASONICQUERYSIZE + 1);
+        sprintf_P(local_log_msg, PSTR("heatpump request query sent bytes: %d"), PANASONICQUERYSIZE + 1);
         xQueueSend(logQueue,local_log_msg,0);    
       }
     }
+
+    // third priority: extra data block query every waitTime seconds (offset from basic query)
+    if ((!sending) && (!heishamonSettings.listenonly) && extraDataBlockAvailable) {
+      if ((unsigned long)(now - lastHPExtraSendTime) >= (1000 * heishamonSettings.waitTime)) {
+        lastHPExtraSendTime = now;
+        sending = true;
+        sendCommandReadTime = now;
+        panasonicQuery[3] = 0x21;
+        byte chk = calcChecksum(panasonicQuery, PANASONICQUERYSIZE);
+        heatpumpSerial.write(panasonicQuery, PANASONICQUERYSIZE);
+        heatpumpSerial.write(chk);
+        panasonicQuery[3] = 0x10;
+        xQueueSend(logQueue, (void*)"heatpump extra query sent", 0);
+      }
+    }    
 
     // lowest priority: user commands from queue
     if ((!sending) && (!heishamonSettings.listenonly)) {
