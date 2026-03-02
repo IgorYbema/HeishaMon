@@ -741,21 +741,25 @@ bool readSerial()
             log_message(_F("Extra data available on this heatpump"));
             extraDataBlockAvailable = true; //request for extra data next run
           }
+          #ifdef RAWDEBUG
           {
             char mqtt_topic[256];
             sprintf(mqtt_topic, "%s/raw/data", heishamonSettings.mqtt_topic_base);
             mqtt_client.publish(mqtt_topic, (const uint8_t *)actData, DATASIZE, false); //do not retain this raw data
           }
+          #endif
           data_length = 0;
           return true;
         } else if (data[3] == 0x21) { //decode the new model extra data block
           extraDataBlockAvailable = true; //set the flag to true so we know we can request this data always
           decode_heatpump_data_extra(data, actDataExtra, mqtt_client, log_message, heishamonSettings.mqtt_topic_base, heishamonSettings.updateAllTime);
+          #ifdef RAWDEBUG
           {
             char mqtt_topic[256];
             sprintf(mqtt_topic, "%s/raw/dataextra", heishamonSettings.mqtt_topic_base);
             mqtt_client.publish(mqtt_topic, (const uint8_t *)actDataExtra, DATASIZE, false); //do not retain this raw data
           }
+          #endif
           data_length = 0;
           return true;
         } else {
