@@ -120,8 +120,8 @@
 |  TOP | 115 | 15 |   | ? |
 |  TOP123/124/125/126 | 116 | 5a | 1st & 2nd bit Zone 2 Pump ( b01 - OFF, b10 - ON ) ,  3rd & 4th bit = Zone 1 Pump ( b01 - OFF, b10 - ON ), 5th & 6th bit = 2way Valve ( b01 - Cooling, b10 - Heating) , 7th & 8th bit = 3way Valve ( b01 - Room, b10 - Tank)  | Z1 & Z2 Pump 2way & 3wa Valve staus |
 |  TOP69 | 117 | 05 | Sterilization on/off (bit5and6)  , Z2 active (bit7) ,Z1 active (bit8)| Sterilization status Zone active information (look byte #6) |
-|  TOP | 118 | 12 |   | fractional info for TOP5 and TOP6 values |
-|  TOP | 119 | 12 |   | ? |
+|  TOP | 118 | 12 |   | fractional info for TOP5 (first 3 LSB) and TOP6 (next 3 LSB) values |
+|  TOP | 119 | 12 |   | fractional info for TOP139 (first 3 LSB) and (assumed) TOP140 (next 3 LSB) values |
 |  TOP | 120 | 19 | 3rd & 4th bit = b01 Heater Inactive ,b10 Heater Active<br/> 5th & 6th bit = b01 Cooling Inactive ,b10 Cooling Active<br/> | Custom menu settings<br/>Back-up Heater<br/>Cool Mode |
 |  TOP | 121 | 00 |   | 0 byte |
 |  TOP | 122 | 00 |   | 0 byte |
