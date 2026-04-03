@@ -234,6 +234,8 @@ SET42 | SetPumpFlowrateMode | Set Pump Flowrate Mode | 0=deltaT, 1=max. duty
 SET43 | SetDHWSensorSelection | Set DHW tank sensor selection (K/L series All-In-One only) | 0=Top, 1=Center
 SET44 | SetDHWHeaterState | Allow DHW backup/booster heater | 0=blocked, 1=free
 SET45 | SetRoomHeaterState | Allow Room backup/booster heater | 0=blocked, 1=free
+SET46 | SetHeaterOnOutdoorTemp | Outdoor temperature for heater ON | -15 to 20
+
 
 *If you operate your heatpump in water mode with direct temperature setup: topics ending xxxRequestTemperature will set the absolute target temperature.*
 
