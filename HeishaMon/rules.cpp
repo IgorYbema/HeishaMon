@@ -32,6 +32,9 @@
 #define OPTDATASIZE 20
 
 bool send_command(byte* command, int length);
+#ifdef ESP32
+extern QueueHandle_t pcbQueue;
+#endif
 
 extern int dallasDevicecount;
 extern dallasDataStruct *actDallasData;
@@ -690,6 +693,9 @@ static int8_t vm_value_set(struct rules_t *obj) {
           if(stricmp((char *)&key[1], tmp.name) == 0) {
             uint16_t len = tmp.func(payload, log_msg);
             log_message(log_msg);
+#ifdef ESP32
+            xQueueOverwrite(pcbQueue, optionalPCBQuery);
+#endif
             break;
           }
         }
