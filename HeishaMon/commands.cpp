@@ -1035,6 +1035,26 @@ unsigned int set_room_heater_state(char *msg, unsigned char *cmd, char *log_msg)
   return sizeof(panasonicSendQuery);
 }
 
+unsigned int set_heater_on_outdoor_temp(char *msg, unsigned char *cmd, char *log_msg) {
+
+  String stringValue(msg);
+
+  byte byteValue = stringValue.toInt() + 128;
+
+  {
+    char tmp[256] = { 0 };
+    snprintf_P(tmp, 255, PSTR("set heater on outdoor temp to %d"), byteValue - 128 );
+    memcpy(log_msg, tmp, sizeof(tmp));
+  }
+
+  {
+    memcpy_P(cmd, panasonicSendQuery, sizeof(panasonicSendQuery));
+    cmd[85] = byteValue;
+  }
+
+  return sizeof(panasonicSendQuery);
+}
+
 unsigned int set_external_compressor_control(char *msg, unsigned char *cmd, char *log_msg){
   const byte off_state=64;
   const byte address=23;
