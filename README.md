@@ -186,7 +186,7 @@ Prints a value to the console.
 Concatenates various values into a combined string. E.g.: `@SetCurves = concat('{zone1:{heat:{target:{high:', @Z1_Heat_Curve_Target_High_Temp, ',low:32}}}}');`
 
 - `gpio`
-Allows setting or getting a GPIO state. When called with a single argument, a GPIO state is returned. When called with two arguments the state of a GPIO is set. This function only sets digital pins so the state can only be 0 or 1. The two relays on the large heishamon are gpio21 and gpio47. See the example to switch them each two seconds.
+Allows setting or getting a GPIO state. When called with a single argument, a GPIO state is returned. When called with two arguments the state of a GPIO is set. This function only sets digital pins so the state can only be 0 or 1. The two relays on the large heishamon are gpio21 and gpio47. The user-configurable extra GPIOs (see below) can also be addressed by their pin number. See the example to switch the relays each two seconds.
 
 ```
 on System#Boot then
@@ -365,6 +365,44 @@ The software also supports ds18b20 1-wire temperature sensors reading. A proper 
 
 ## Large board relay control
 The newer, large, heishamon contains two onboard relays which can be switched on and off using MQTT commands. The relays can be used for any contact switching, even 230V mains (max 5A). For example to switch the 230V contacts in the heatpump for controlling the 'external thermostat', switching a pump on or off or other lower power devices. I do not recommend to use the relay as a switch for a electric heater as they use too much power. To control the relay just send a value of 1 or 0 to the MQTT topic "panasonic_heat_pump/gpio/relay/one" for relay one or "panasonic_heat_pump/gpio/relay/two" for relay two.
+
+## User-configurable extra GPIO
+In addition to the fixed relay pins, HeishaMon exposes a number of user-configurable GPIO pins that can each be independently set to Input (pull-up), Input, or Output mode via the settings web menu.
+
+**Available pins per platform:**
+- **ESP8266:** 3 extra GPIOs (pins 1, 3, 16)
+- **ESP32:** 5 extra GPIOs (pins 33–37); relay pins 21 and 47 remain fixed
+
+The mode for each pin is saved in settings and applied on boot and whenever settings are saved.
+
+**Controlling output GPIOs over MQTT:**
+Send `1`, `0`, `on`, `off`, `true`, or `false` to:
+```
+panasonic_heat_pump/gpio/extra/N
+```
+where `N` is the 1-based index of the extra GPIO (e.g. `extra/1` for the first extra pin).
+
+**Reading GPIO states over MQTT:**
+Input and output states are automatically published to the same topics on change and on first MQTT connect (retained).
+
+**HTTP API:**
+You can read all extra GPIO states as JSON via a GET request:
+```
+GET /gpio
+```
+Response example:
+```json
+[{"pin":33,"mode":2,"state":1},{"pin":34,"mode":0,"state":0}, ...]
+```
+where `mode` is 0 = Input (pull-up), 1 = Input, 2 = Output.
+
+To set an output pin via HTTP POST:
+```
+POST /gpio?pin=N&value=1
+```
+
+**Using extra GPIOs in rules:**
+The `gpio()` rules function works with the extra GPIO pins by their physical pin number, the same as the relay pins.
 
 ## Opentherm support
 If your heishamon board supports opentherm the software can also be used to bridge opentherm information from a compatible thermostat to your home automation over MQTT or JSON and as mentioned above it can also be connected directly in the rules to connect opentherm information to the heatpump and back, for example to display the outside temperature from the heatpump on your opentherm thermostat. If you enable opentherm support in settings there will be a new tab visible in the web page. On that tab you will see opentherm values. Some are of type R(ead) and some are W(rite), and some are both. Read means that the thermostat can read that information from the heishamon. You provide that information over MQTT (or using the rules) by updating this value on the mqtt 'opentherm/read' topic, for example 'panasonic_heat_pump/opentherm/read/outsideTemp'. The write values are information from the thermostat, like 'roomTemp'. These are available on mqtt topic 'opentherm/write'. You can use these values to change the heatpump behaviour in anyway you want using your home automation and mqtt set-commands to heishamon on using the internal rules.
