@@ -1625,6 +1625,13 @@ static const char settingsForm2[] FLASHPROG = R"====(
     <div class='setting-row'><label class='setting-label'>Port 2 standby threshold</label><span style='font-size:12px;color:var(--text-muted)'><span id='s0_minwatt_2'>—</span> W</span></div>
   </div></div>
   </div>
+  <div class='panel' style='margin-bottom:16px'>
+  <div class='panel-header'><h3>Extra GPIO</h3></div>
+  <div class='settings-grid'>
+    <div class='setting-row'><label class='setting-label'>GPIO 1 (pin 1)</label><select name='gpio_1_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
+    <div class='setting-row'><label class='setting-label'>GPIO 2 (pin 3)</label><select name='gpio_2_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
+    <div class='setting-row'><label class='setting-label'>GPIO 3 (pin 16)</label><select name='gpio_3_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
+  </div></div>
   <div class='form-actions'>
     <button type='submit' class='btn btn-primary'>Save Settings</button>
   </div>
@@ -1727,6 +1734,15 @@ static const char settingsForm2[] FLASHPROG = R"====(
     <div class='setting-row'><label class='setting-label'>Port 2 standby threshold</label><span style='font-size:12px;color:var(--text-muted)'><span id='s0_minwatt_2'>—</span> W</span></div>
   </div></div>
   </div>
+  <div class='panel' style='margin-bottom:16px'>
+  <div class='panel-header'><h3>Extra GPIO</h3></div>
+  <div class='settings-grid'>
+    <div class='setting-row'><label class='setting-label'>GPIO 1 (pin 33)</label><select name='gpio_1_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
+    <div class='setting-row'><label class='setting-label'>GPIO 2 (pin 34)</label><select name='gpio_2_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
+    <div class='setting-row'><label class='setting-label'>GPIO 3 (pin 35)</label><select name='gpio_3_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
+    <div class='setting-row'><label class='setting-label'>GPIO 4 (pin 36)</label><select name='gpio_4_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
+    <div class='setting-row'><label class='setting-label'>GPIO 5 (pin 37)</label><select name='gpio_5_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
+  </div></div>
   <div class='form-actions'>
     <button type='submit' class='btn btn-primary'>Save Settings</button>
   </div>

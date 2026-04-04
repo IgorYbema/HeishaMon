@@ -252,6 +252,15 @@ void loadSettings(settingsStruct *heishamonSettings) {
           if (jsonDoc[F("s0_2_interval")] ) heishamonSettings->s0Settings[1].lowerPowerInterval = jsonDoc[F("s0_2_interval")];
           if (jsonDoc[F("s0_2_minpulsewidth")]) heishamonSettings->s0Settings[1].minimalPulseWidth = jsonDoc[F("s0_2_minpulsewidth")];
           if (jsonDoc[F("s0_2_maxpulsewidth")]) heishamonSettings->s0Settings[1].maximalPulseWidth = jsonDoc[F("s0_2_maxpulsewidth")];
+          for (int i = 0; i < NUMGPIO_USER; i++) {
+            char key[16];
+            snprintf(key, sizeof(key), "gpio_%d_mode", i + 1);
+            if (jsonDoc[key]) {
+              unsigned int mode = jsonDoc[key];
+              if (mode > GPIO_MODE_OUTPUT) mode = GPIO_MODE_INPUT_PULLUP;
+              heishamonSettings->gpioSettings.gpioUserMode[i] = mode;
+            }
+          }
           ntpReload(heishamonSettings);
         } else {
           log_message(_F("Failed to load json config, forcing config reset."));
@@ -475,7 +484,12 @@ void settingsToJson(JsonDocument &jsonDoc, settingsStruct *heishamonSettings) {
   jsonDoc[F("s0_2_ppkwh")] = heishamonSettings->s0Settings[1].ppkwh;
   jsonDoc[F("s0_2_interval")] = heishamonSettings->s0Settings[1].lowerPowerInterval;
   jsonDoc[F("s0_2_minpulsewidth")] = heishamonSettings->s0Settings[1].minimalPulseWidth;
-  jsonDoc[F("s0_2_maxpulsewidth")] = heishamonSettings->s0Settings[1].maximalPulseWidth;  
+  jsonDoc[F("s0_2_maxpulsewidth")] = heishamonSettings->s0Settings[1].maximalPulseWidth;
+  for (int i = 0; i < NUMGPIO_USER; i++) {
+    char key[16];
+    snprintf(key, sizeof(key), "gpio_%d_mode", i + 1);
+    jsonDoc[key] = heishamonSettings->gpioSettings.gpioUserMode[i];
+  }
 }
 
 void saveJsonToFile(JsonDocument &jsonDoc, const char* filename) {
@@ -693,6 +707,16 @@ int saveSettings(struct webserver_t *client, settingsStruct *heishamonSettings) 
       jsonDoc[F("s0_2_minpulsewidth")] = tmp->value;
     } else if (strcmp(tmp->name.c_str(), "s0_2_maxpulsewidth") == 0) {
       jsonDoc[F("s0_2_maxpulsewidth")] = tmp->value;
+    } else {
+      // Handle gpio_N_mode keys dynamically
+      for (int i = 0; i < NUMGPIO_USER; i++) {
+        char key[16];
+        snprintf(key, sizeof(key), "gpio_%d_mode", i + 1);
+        if (strcmp(tmp->name.c_str(), key) == 0) {
+          jsonDoc[key] = tmp->value;
+          break;
+        }
+      }
     }
     tmp = tmp->next;
   }
@@ -1214,6 +1238,8 @@ int handleJsonOutput(struct webserver_t *client, char* actData, char* actDataExt
       webserver_send_content_P(client, PSTR(",\"opentherm\":"), 13);
       openthermJsonOutput(client);
     }
+    webserver_send_content_P(client, PSTR(",\"gpio\":"), 8);
+    gpioJsonOutput(client, heishamonSettings->gpioSettings);
     webserver_send_content_P(client, PSTR("}"), 1);
   }
   return 0;
