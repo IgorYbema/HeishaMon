@@ -1417,6 +1417,8 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
           case 190: {
               if (client->content == 0) {
                 webserver_send(client, 200, (char *)"application/json", 0);
+                return 0;
+              } else if (client->content == 1) {
                 gpioJsonOutput(client, heishamonSettings.gpioSettings);
                 return 0;
               }
