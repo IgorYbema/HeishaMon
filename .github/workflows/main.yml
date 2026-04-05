@@ -123,5 +123,5 @@ jobs:
           body: |
             Release ${{ github.ref_name }}
             Commit: ${{ github.sha }}
-          prerelease: false
+          prerelease: true
           files: HeishaMon/HeishaMon_*.bin
