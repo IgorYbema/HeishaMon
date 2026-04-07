@@ -275,7 +275,7 @@ end
 ```
 
 # Factory reset
-A factory reset can be performed on the web interface but if the web interface is unavailable you can perform a double reset. The double reset should be performed not too fast but also not too slow. Usually halve a second between both resets should do the trick. To indicate that the double reset performed a factory reset, the blue led will flash rapidly (You need to press reset again now to restart HeishaMon back to normal where a WiFi hotspot should be visible again).
+A factory reset can be performed on the web interface. If the web interface is unavailable (not wifi or other reason) you can perform a hard factory reset. With recent firwmare you just hold the boot/flash button for more than 10 seconds. With older firmware you most do a double reset. This double reset should be performed not too fast but also not too slow. Usually halve a second between both resets should do the trick. To indicate that the double reset performed a factory reset, the blue led will flash rapidly (You need to press reset again now to restart HeishaMon back to normal where a WiFi hotspot should be visible again).
 
 # Further information
 Below you can find some technical details about the project. How to build your own cables. How to build your own PCB etc.
