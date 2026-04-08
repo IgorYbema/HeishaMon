@@ -44,72 +44,85 @@ static unsigned int temp2hex(float temp) {
 }
 
 // Table-driven main heatpump commands.
-// Encoding: cmd[byte_idx] = (byte)(base + val * step)
+// Encoding: cmd[byte_idx] = (byte)(mask | (val * step))
 // where val = atoi(msg) is the integer value sent by the user over MQTT.
 //
-// Examples of the three encoding patterns used:
-//   bool on/off  → base = off_byte, step = (on_byte - off_byte)   e.g. 0→1, 1→2 (base=1, step=1)
-//   signed temp  → base = 128,      step = 1                       e.g. -20°C → 108
-//   multi-state  → base = step,     step = step                    e.g. quiet 0-3 → 8/16/24/32 (base=8, step=8)
+// mask = bitmask for state 0 (the protocol bits that are always set for this field's "off/zero" state)
+// step = bitmask increment per state value
+//
+// Examples:
+//   bool on/off  → mask = off_bits, step = off_bits   e.g. off=0x01, on=0x02 (mask=0x01, step=0x01)
+//   signed temp  → mask = 0x80,     step = 1          e.g. 20°C → 0x80|20 = 148
+//   multi-state  → mask = step,     step = step       e.g. quiet 0-3 → 0x08/0x10/0x18/0x20
+//   force/reset  → mask = 0,        step = bit        e.g. off=0x00, on=bit
 const SimpleCmdDef simpleCmds[] PROGMEM = {
-  // name,                           log_name,                              idx, base, step
-  { "SetHeatpump",                   "heatpump state",                       4,  1,    1  },
-  { "SetPump",                       "pump state",                           4,  16,   16 },
-  { "SetMaxPumpDuty",                "max pump duty",                       45,  1,    1  },
-  // quiet mode: 0=off, 1=level1, 2=level2, 3=level3 → bytes 8/16/24/32
-  { "SetQuietMode",                  "quiet mode",                           7,  8,    8  },
-  { "SetZ1HeatRequestTemperature",   "z1 heat request temperature",         38,  128,  1  },
-  { "SetZ1CoolRequestTemperature",   "z1 cool request temperature",         39,  128,  1  },
-  { "SetZ2HeatRequestTemperature",   "z2 heat request temperature",         40,  128,  1  },
-  { "SetZ2CoolRequestTemperature",   "z2 cool request temperature",         41,  128,  1  },
-  { "SetForceDHW",                   "force DHW mode",                       4,  64,   64 },
-  { "SetForceDefrost",               "force defrost mode",                   8,  0,    2  },
-  { "SetForceSterilization",         "force sterilization mode",             8,  0,    4  },
-  { "SetHolidayMode",                "holiday mode",                         5,  16,   16 },
-  // powerful mode: 0=off, 1=30min, 2=60min, 3=90min → bytes 1/2/3/4
-  { "SetPowerfulMode",               "powerful mode",                        7,  1,    1  },
-  { "SetDHWTemp",                    "DHW temperature",                     42,  128,  1  },
-  // SetOperationMode is handled separately (non-linear lookup table)
-  // zones: 0=zone1, 1=zone2, 2=both → bytes 64/128/192
-  { "SetZones",                      "zones active state",                   6,  64,   64 },
-  { "SetFloorHeatDelta",             "floor heat delta",                    84,  128,  1  },
-  { "SetFloorCoolDelta",             "floor cool delta",                    94,  128,  1  },
-  { "SetDHWHeatDelta",               "DHW heat delta",                      99,  128,  1  },
-  { "SetReset",                      "reset",                                8,  0,    1  },
-  { "SetHeaterDelayTime",            "heater delay time",                  104,  1,    1  },
-  { "SetHeaterStartDelta",           "heater start delta",                 105,  128,  1  },
-  { "SetHeaterStopDelta",            "heater stop delta",                  106,  128,  1  },
-  { "SetMainSchedule",               "main schedule",                        5,  64,   64 },
-  { "SetAltExternalSensor",          "alternative external sensor",         20,  16,   16 },
-  // external pad heater: 0=off, 1=type1, 2=type2 → bytes 16/32/48
-  { "SetExternalPadHeater",          "external pad heater",                 25,  16,   16 },
-  { "SetBufferDelta",                "buffer tank delta",                   59,  128,  1  },
-  { "SetBuffer",                     "buffer enabled",                      24,  4,    4  },
-  { "SetHeatingOffOutdoorTemp",      "heating off outdoor temp",            83,  128,  1  },
-  { "SetExternalControl",            "external control enabled",            23,  1,    1  },
-  { "SetExternalError",              "external error signal enabled",       23,  16,   16 },
-  { "SetExternalCompressorControl",  "external compressor control enabled", 23,  64,   64 },
-  { "SetExternalHeatCoolControl",    "external cool/heat control enabled",  23,  4,    4  },
-  { "SetBivalentControl",            "bivalent control",                    26,  1,    1  },
-  // bivalent mode: 0=alternativ, 1=parallel, 2=advanced parallel → bytes 4/8/12
-  { "SetBivalentMode",               "bivalent mode",                       26,  4,    4  },
-  { "SetBivalentStartTemp",          "bivalent start temperature",          65,  128,  1  },
-  { "SetBivalentAPStartTemp",        "bivalent ap start temperature",       66,  128,  1  },
-  { "SetBivalentAPStopTemp",         "bivalent ap stop temperature",        68,  128,  1  },
-  // heating control, smart DHW, quiet priority, pump flowrate: 0→off_byte, 1→on_byte
-  { "SetHeatingControl",             "heating control",                     30,  4,    4  },
-  { "SetSmartDHW",                   "smart DHW",                           24,  64,   64 },
-  { "SetQuietModePriority",          "quiet mode priority",                 11,  16,   16 },
-  { "SetPumpFlowrateMode",           "pump flowrate mode",                  29,  16,   16 },
-  { "SetDHWSensorSelection",         "DHW sensor selection",                11,  1,    1  },
-  { "SetDHWHeaterState",             "DHW heater state",                     9,  4,    4  },
-  { "SetRoomHeaterState",            "room heater state",                    9,  1,    1  },
-  { "SetHeaterOnOutdoorTemp",        "heater on outdoor temp",              85,  128,  1  },
+  // name,                           log_name,                              idx,  mask,  step
+  { "SetHeatpump",                   "heatpump state",                       4,  0x01,  0x01 },
+  { "SetPump",                       "pump state",                           4,  0x10,  0x10 },
+  { "SetMaxPumpDuty",                "max pump duty",                       45,  0x01,  0x01 },
+  // quiet mode: 0=off, 1=level1, 2=level2, 3=level3 → 0x08/0x10/0x18/0x20
+  { "SetQuietMode",                  "quiet mode",                           7,  0x08,  0x08 },
+  { "SetZ1HeatRequestTemperature",   "z1 heat request temperature",         38,  0x80,  1    },
+  { "SetZ1CoolRequestTemperature",   "z1 cool request temperature",         39,  0x80,  1    },
+  { "SetZ2HeatRequestTemperature",   "z2 heat request temperature",         40,  0x80,  1    },
+  { "SetZ2CoolRequestTemperature",   "z2 cool request temperature",         41,  0x80,  1    },
+  { "SetForceDHW",                   "force DHW mode",                       4,  0x40,  0x40 },
+  { "SetForceDefrost",               "force defrost mode",                   8,  0x00,  0x02 },
+  { "SetForceSterilization",         "force sterilization mode",             8,  0x00,  0x04 },
+  { "SetHolidayMode",                "holiday mode",                         5,  0x10,  0x10 },
+  // powerful mode: 0=off, 1=30min, 2=60min, 3=90min → 0x01/0x02/0x03/0x04
+  { "SetPowerfulMode",               "powerful mode",                        7,  0x01,  0x01 },
+  { "SetDHWTemp",                    "DHW temperature",                     42,  0x80,  1    },
+  // SetOperationMode is handled separately (bitmask OR — see opModeLookup)
+  // zones: 0=zone1, 1=zone2, 2=both → 0x40/0x80/0xC0
+  { "SetZones",                      "zones active state",                   6,  0x40,  0x40 },
+  { "SetFloorHeatDelta",             "floor heat delta",                    84,  0x80,  1    },
+  { "SetFloorCoolDelta",             "floor cool delta",                    94,  0x80,  1    },
+  { "SetDHWHeatDelta",               "DHW heat delta",                      99,  0x80,  1    },
+  { "SetReset",                      "reset",                                8,  0x00,  0x01 },
+  { "SetHeaterDelayTime",            "heater delay time",                  104,  0x01,  0x01 },
+  { "SetHeaterStartDelta",           "heater start delta",                 105,  0x80,  1    },
+  { "SetHeaterStopDelta",            "heater stop delta",                  106,  0x80,  1    },
+  { "SetMainSchedule",               "main schedule",                        5,  0x40,  0x40 },
+  { "SetAltExternalSensor",          "alternative external sensor",         20,  0x10,  0x10 },
+  // external pad heater: 0=off, 1=type1, 2=type2 → 0x10/0x20/0x30
+  { "SetExternalPadHeater",          "external pad heater",                 25,  0x10,  0x10 },
+  { "SetBufferDelta",                "buffer tank delta",                   59,  0x80,  1    },
+  { "SetBuffer",                     "buffer enabled",                      24,  0x04,  0x04 },
+  { "SetHeatingOffOutdoorTemp",      "heating off outdoor temp",            83,  0x80,  1    },
+  { "SetExternalControl",            "external control enabled",            23,  0x01,  0x01 },
+  { "SetExternalError",              "external error signal enabled",       23,  0x10,  0x10 },
+  { "SetExternalCompressorControl",  "external compressor control enabled", 23,  0x40,  0x40 },
+  { "SetExternalHeatCoolControl",    "external cool/heat control enabled",  23,  0x04,  0x04 },
+  { "SetBivalentControl",            "bivalent control",                    26,  0x01,  0x01 },
+  // bivalent mode: 0=alternativ, 1=parallel, 2=advanced parallel → 0x04/0x08/0x0C
+  { "SetBivalentMode",               "bivalent mode",                       26,  0x04,  0x04 },
+  { "SetBivalentStartTemp",          "bivalent start temperature",          65,  0x80,  1    },
+  { "SetBivalentAPStartTemp",        "bivalent ap start temperature",       66,  0x80,  1    },
+  { "SetBivalentAPStopTemp",         "bivalent ap stop temperature",        68,  0x80,  1    },
+  { "SetHeatingControl",             "heating control",                     30,  0x04,  0x04 },
+  { "SetSmartDHW",                   "smart DHW",                           24,  0x40,  0x40 },
+  { "SetQuietModePriority",          "quiet mode priority",                 11,  0x10,  0x10 },
+  { "SetPumpFlowrateMode",           "pump flowrate mode",                  29,  0x10,  0x10 },
+  { "SetDHWSensorSelection",         "DHW sensor selection",                11,  0x01,  0x01 },
+  { "SetDHWHeaterState",             "DHW heater state",                     9,  0x04,  0x04 },
+  { "SetRoomHeaterState",            "room heater state",                    9,  0x01,  0x01 },
+  { "SetHeaterOnOutdoorTemp",        "heater on outdoor temp",              85,  0x80,  1    },
 };
 
-// SetOperationMode uses a non-linear mapping; indices 0-6 map to these protocol bytes.
+// SetOperationMode byte is OR of two bitmask groups:
+//   main group: 0x10 = heating/cooling active, 0x20 = DHW active
+//   mode  bits: 0x02 = heat, 0x03 = cool, 0x08 = auto, 0x01 = DHW-only
 // 0=heat only, 1=cool only, 2=auto, 3=DHW only, 4=heat+DHW, 5=cool+DHW, 6=auto+DHW
-const byte opModeLookup[] PROGMEM = {18, 19, 24, 33, 34, 35, 40};
+const byte opModeLookup[] PROGMEM = {
+  0x10|0x02,  // 0: heat only
+  0x10|0x03,  // 1: cool only
+  0x10|0x08,  // 2: auto
+  0x20|0x01,  // 3: DHW only
+  0x20|0x02,  // 4: heat+DHW
+  0x20|0x03,  // 5: cool+DHW
+  0x20|0x08,  // 6: auto+DHW
+};
 
 // Optional PCB command table.
 // OPT_BYTE6_BITS: bit-mask update of optionalPCBQuery[6]; mask/bit define the field.
@@ -171,13 +184,13 @@ void send_heatpump_command(char* topic, char *msg, bool (*send_command)(byte*, i
   char log_msg[256] = { 0 };
   int val = atoi(msg);
 
-  // Linear-encoded commands: cmd[byte_idx] = base + val * step
+  // Bitmask-encoded commands: cmd[byte_idx] = mask | (val * step)
   for (unsigned int i = 0; i < sizeof(simpleCmds) / sizeof(simpleCmds[0]); i++) {
     SimpleCmdDef def;
     memcpy_P(&def, &simpleCmds[i], sizeof(def));
     if (strcmp(topic, def.name) == 0) {
       memcpy_P(cmd, panasonicSendQuery, sizeof(panasonicSendQuery));
-      cmd[def.byte_idx] = (byte)(def.base + val * def.step);
+      cmd[def.byte_idx] = (byte)(def.mask | (val * def.step));
       snprintf_P(log_msg, 255, PSTR("set %s to %d"), def.log_name, val);
       log_message(log_msg);
       send_command(cmd, sizeof(panasonicSendQuery));

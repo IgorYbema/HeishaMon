@@ -29,13 +29,14 @@ extern const char* mqtt_willtopic;
 extern const char* mqtt_iptopic;
 extern const char* mqtt_send_raw_value_topic;
 
-// Main heatpump command: cmd[byte_idx] = (byte)(base + val * step)
+// Main heatpump command: cmd[byte_idx] = (byte)(mask | (val * step))
 // where val = atoi(msg) is the user-supplied integer value
+// mask = bitmask for state 0 (e.g. "off" bit); step = increment per state
 struct SimpleCmdDef {
   char name[29];
   char log_name[36];
   uint8_t byte_idx;
-  uint8_t base;
+  uint8_t mask;
   uint8_t step;
 };
 

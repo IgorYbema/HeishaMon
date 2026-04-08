@@ -1020,6 +1020,23 @@ void setupOTA() {
 
 
 
+// Helper for case 100: captures log output into the HTTP client's userdata buffer
+// as well as forwarding to the normal log. Uses a static pointer since send_heatpump_command
+// takes a plain function pointer (no closure).
+static struct webserver_t *s_webcmd_client = nullptr;
+static void webcmd_log(char *msg) {
+  void *newp = realloc(s_webcmd_client->userdata, strlen((char *)s_webcmd_client->userdata) + strlen(msg) + 2);
+  if (newp == NULL) {
+    loggingSerial.printf(PSTR("Out of memory %s:#%d\n"), __FUNCTION__, __LINE__);
+    ESP.restart();
+    exit(-1);
+  }
+  s_webcmd_client->userdata = newp;
+  strcat((char *)s_webcmd_client->userdata, msg);
+  strcat((char *)s_webcmd_client->userdata, "\n");
+  log_message(msg);
+}
+
 int8_t webserver_cb(struct webserver_t *client, void *dat) {
   
 
@@ -1139,52 +1156,12 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
               return 0;
             } break;
           case 100: {
-              unsigned char cmd[256] = { 0 };
               char cpy[args->len + 1];
-              char log_msg[256] = { 0 };
-              unsigned int len = 0;
-
               memset(&cpy, 0, args->len + 1);
               snprintf((char *)&cpy, args->len + 1, "%.*s", args->len, args->value);
-
-              for (uint8_t x = 0; x < sizeof(commands) / sizeof(commands[0]); x++) {
-                cmdStruct tmp;
-                memcpy_P(&tmp, &commands[x], sizeof(tmp));
-                if (strcmp((char *)args->name, tmp.name) == 0) {
-                  len = tmp.func(cpy, cmd, log_msg);
-                  if ((client->userdata = realloc(client->userdata, strlen((char *)client->userdata) + strlen(log_msg) + 2)) == NULL) {
-                    loggingSerial.printf(PSTR("Out of memory %s:#%d\n"), __FUNCTION__, __LINE__);
-                    ESP.restart();
-                    exit(-1);
-                  }
-                  strcat((char *)client->userdata, log_msg);
-                  strcat((char *)client->userdata, "\n");
-                  log_message(log_msg);
-                  send_command(cmd, len);
-                }
-              }
-
-              memset(&cmd, 0, 256);
-              memset(&log_msg, 0, 256);
-
-              if (heishamonSettings.optionalPCB) {
-                //optional commands
-                for (uint8_t x = 0; x < sizeof(optionalCommands) / sizeof(optionalCommands[0]); x++) {
-                  optCmdStruct tmp;
-                  memcpy_P(&tmp, &optionalCommands[x], sizeof(tmp));
-                  if (strcmp((char *)args->name, tmp.name) == 0) {
-                    len = tmp.func(cpy, log_msg);
-                    if ((client->userdata = realloc(client->userdata, strlen((char *)client->userdata) + strlen(log_msg) + 2)) == NULL) {
-                      loggingSerial.printf(PSTR("Out of memory %s:#%d\n"), __FUNCTION__, __LINE__);
-                      ESP.restart();
-                      exit(-1);
-                    }
-                    strcat((char *)client->userdata, log_msg);
-                    strcat((char *)client->userdata, "\n");
-                    log_message(log_msg);
-                  }
-                }
-              }
+              s_webcmd_client = client;
+              send_heatpump_command((char *)args->name, cpy, send_command, webcmd_log, heishamonSettings.optionalPCB);
+              s_webcmd_client = nullptr;
             } break;
           case 110: {
               return cacheSettings(client, args);
