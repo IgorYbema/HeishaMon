@@ -56,6 +56,11 @@ struct OptCmdDef {
   uint8_t bit;      // bit shift for OPT_BYTE6_BITS
 };
 
+extern const SimpleCmdDef simpleCmds[];
+extern const int simpleCmds_count;
+extern const OptCmdDef optCmds[];
+extern const int optCmds_count;
+
 void send_heatpump_command(char* topic, char *msg, bool (*send_command)(byte*, int), void (*log_message)(char*), bool optionalPCB);
 bool saveOptionalPCB(byte* command, int length);
 bool loadOptionalPCB(byte* command, int length);

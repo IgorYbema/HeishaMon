@@ -157,10 +157,9 @@ static int8_t is_variable(char *text, uint16_t size) {
     }
 
     if(text[0] == '@') {
-      int nrcommands = sizeof(commands)/sizeof(commands[0]);
-      for(x=0;x<nrcommands;x++) {
-        cmdStruct cmd;
-        memcpy_P(&cmd, &commands[x], sizeof(cmd));
+      for(x=0;x<simpleCmds_count;x++) {
+        SimpleCmdDef cmd;
+        memcpy_P(&cmd, &simpleCmds[x], sizeof(cmd));
         size_t len = strlen(cmd.name);
         if(size-1 == len && strnicmp(&text[1], cmd.name, len) == 0) {
           i = len+1;
@@ -169,10 +168,9 @@ static int8_t is_variable(char *text, uint16_t size) {
         }
       }
 
-      int nroptcommands = sizeof(optionalCommands)/sizeof(optionalCommands[0]);
-      for(x=0;x<nroptcommands;x++) {
-        optCmdStruct cmd;
-        memcpy_P(&cmd, &optionalCommands[x], sizeof(cmd));
+      for(x=0;x<optCmds_count;x++) {
+        OptCmdDef cmd;
+        memcpy_P(&cmd, &optCmds[x], sizeof(cmd));
         size_t len = strlen(cmd.name);
         if(size-1 == len && strnicmp(&text[1], cmd.name, len) == 0) {
           i = len+1;
@@ -249,10 +247,9 @@ static int8_t is_variable(char *text, uint16_t size) {
 static int8_t is_event(char *text, uint16_t size) {
   int i = 1, x = 0, match = 0;
   if(text[0] == '@') {
-    int nrcommands = sizeof(commands)/sizeof(commands[0]);
-    for(x=0;x<nrcommands;x++) {
-      cmdStruct cmd;
-      memcpy_P(&cmd, &commands[x], sizeof(cmd));
+    for(x=0;x<simpleCmds_count;x++) {
+      SimpleCmdDef cmd;
+      memcpy_P(&cmd, &simpleCmds[x], sizeof(cmd));
       size_t len = strlen(cmd.name);
       if(size-1 == len && strnicmp(&text[1], cmd.name, len) == 0) {
         i = len+1;
@@ -262,10 +259,9 @@ static int8_t is_event(char *text, uint16_t size) {
     }
 
     if(match == 0) {
-      int nroptcommands = sizeof(optionalCommands)/sizeof(optionalCommands[0]);
-      for(x=0;x<nroptcommands;x++) {
-        optCmdStruct cmd;
-        memcpy_P(&cmd, &optionalCommands[x], sizeof(cmd));
+      for(x=0;x<optCmds_count;x++) {
+        OptCmdDef cmd;
+        memcpy_P(&cmd, &optCmds[x], sizeof(cmd));
         size_t len = strlen(cmd.name);
         if(size-1 == len && strnicmp(&text[1], cmd.name, len) == 0) {
           i = len+1;
@@ -668,38 +664,7 @@ static int8_t vm_value_set(struct rules_t *obj) {
     }
 
     if(parsing == 0 && !heishamonSettings.listenonly) {
-      unsigned char cmd[256] = { 0 };
-      char log_msg[256] = { 0 };
-
-      for(uint8_t x = 0; x < sizeof(commands) / sizeof(commands[0]); x++) {
-        cmdStruct tmp;
-        memcpy_P(&tmp, &commands[x], sizeof(tmp));
-        if(stricmp((char *)&key[1], tmp.name) == 0) {
-          uint16_t len = tmp.func(payload, cmd, log_msg);
-          log_message(log_msg);
-          send_command(cmd, len);
-          break;
-        }
-      }
-
-      memset(&cmd, 0, sizeof(cmd));
-      memset(&log_msg, 0, sizeof(log_msg));
-
-      if(heishamonSettings.optionalPCB) {
-        //optional commands
-        for(uint8_t x = 0; x < sizeof(optionalCommands) / sizeof(optionalCommands[0]); x++) {
-          optCmdStruct tmp;
-          memcpy_P(&tmp, &optionalCommands[x], sizeof(tmp));
-          if(stricmp((char *)&key[1], tmp.name) == 0) {
-            uint16_t len = tmp.func(payload, log_msg);
-            log_message(log_msg);
-#ifdef ESP32
-            xQueueOverwrite(pcbQueue, optionalPCBQuery);
-#endif
-            break;
-          }
-        }
-      }
+      send_heatpump_command((char *)&key[1], payload, send_command, log_message, heishamonSettings.optionalPCB);
     }
     FREE(payload);
   } else if(key[0] == '?') {

@@ -110,6 +110,8 @@ const SimpleCmdDef simpleCmds[] PROGMEM = {
   { "SetHeaterOnOutdoorTemp",        "heater on outdoor temp",              85,  0x80,  1    },
 };
 
+const int simpleCmds_count = sizeof(simpleCmds) / sizeof(simpleCmds[0]);
+
 // SetOperationMode byte is OR of two bitmask groups:
 //   main group: 0x10 = heating/cooling active, 0x20 = DHW active
 //   mode  bits: 0x02 = heat, 0x03 = cool, 0x08 = auto, 0x01 = DHW-only
@@ -145,6 +147,8 @@ const OptCmdDef optCmds[] PROGMEM = {
   { "SetSolarTemp",                 "solar temp",              OPT_TEMP,      13,  0,     0  },
   { "SetOptPCBByte9",               "byte 9",                  OPT_DIRECT,     9,  0,     0  },
 };
+
+const int optCmds_count = sizeof(optCmds) / sizeof(optCmds[0]);
 
 static unsigned int handle_curves(char *msg, unsigned char *cmd, char *log_msg) {
   memcpy_P(cmd, panasonicSendQuery, sizeof(panasonicSendQuery));
