@@ -321,7 +321,7 @@ Die zur Verbindung mit der Wärmepumpe benötigten PCBs wurden von Projektmitgli
 [Bild ESP12-F](NewHeishamon.JPG)
 
 Um es einfach zu machen, kannst du eine fertige Platine von einigen Projektmitgliedern bestellen: \
-[Tindie-Shop](https://www.tindie.com/stores/thehognl/) von Igor Ybema (aka TheHogNL) aus den Niederlanden
+[Lectronz shop](https://lectronz.com/products/heishamon-communication-pcb) von Igor Ybema (aka TheHogNL) aus den Niederlanden
 
 ## Arduino-Image selbst bauen
 Boards: \
