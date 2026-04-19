@@ -321,7 +321,7 @@ De PCB's die nodig zijn om verbinding te maken met de warmtepomp zijn ontworpen 
 [Foto ESP12-F](NewHeishamon.JPG)
 
 Om het makkelijk te maken kun je een compleet PCB bestellen bij sommige projectleden: \
-[Tindie-winkel](https://www.tindie.com/stores/thehognl/) van Igor Ybema (ook bekend als TheHogNL) uit Nederland
+[Lectronz shop](https://lectronz.com/products/heishamon-communication-pcb) van Igor Ybema (ook bekend als TheHogNL) uit Nederland
 
 ## Het Arduino-image zelf bouwen
 Boards: \
