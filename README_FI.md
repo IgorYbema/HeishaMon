@@ -321,7 +321,7 @@ Lämpöpumppuun kytkemiseen tarvittavat PCB:t on suunniteltu projektin jäsenten
 [Kuva ESP12-F](NewHeishamon.JPG)
 
 Jos haluat päästä helpolla, voit myös ostaa valmiin piirilevyn tai kaapelin, joita projektin jäsenet ovat tehneet: \
-[Tindie-kauppa](https://www.tindie.com/stores/thehognl/) - Igor Ybema (aka TheHogNL) Hollannissa
+[Lectronz kauppa](https://lectronz.com/products/heishamon-communication-pcb)  - Igor Ybema (aka TheHogNL) Hollannissa
 
 ## Arduino-imagen kääntäminen
 Boards: \
