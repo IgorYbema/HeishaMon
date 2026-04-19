@@ -322,7 +322,7 @@ The PCB's needed to connect to the heatpump are designed by project members and 
 [Picture ESP12-F](NewHeishamon.JPG)
 
 To make things easy you can order a completed PCB from some project members: \
-[Tindie shop](https://www.tindie.com/stores/thehognl/) from Igor Ybema (aka TheHogNL) based in the Netherlands
+[Lectronz shop](https://lectronz.com/products/heishamon-communication-pcb) from Igor Ybema (aka TheHogNL) based in the Netherlands
 
 ## Building the arduino image yourself
 boards: \
