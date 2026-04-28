@@ -1182,6 +1182,9 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
                     strcat((char *)client->userdata, log_msg);
                     strcat((char *)client->userdata, "\n");
                     log_message(log_msg);
+#ifdef ESP32
+                    xQueueOverwrite(pcbQueue, optionalPCBQuery);
+#endif
                   }
                 }
               }
