@@ -2108,6 +2108,7 @@ static void bc_assign_slots(struct rules_t *obj) {
         z = (struct vm_top_t *)&obj->bc.buffer[e];
       }
 
+      int8_t d_before = (int8_t)getval(x->a);
       if(z != NULL && gettype(x->type) == OP_CALL &&
          gettype(z->type) == OP_PUSH &&
          (int8_t)getval(z->a) >= min) {
@@ -2124,6 +2125,7 @@ static void bc_assign_slots(struct rules_t *obj) {
       if(gettype(obj->bc.buffer[a]) != OP_SETVAL &&
          gettype(obj->bc.buffer[a]) != OP_CLEAR &&
          !(gettype(obj->bc.buffer[a]) == OP_PUSH && getval(x->c) == 1)) {
+        logprintf_P(F("DEBUG loop1: OUTER type=%d old_a=%d -> vars=%d (b=%d c=%d)"), gettype(obj->bc.buffer[a]), d_before, vars, (int8_t)getval(x->b), (int8_t)getval(x->c));
         setval(x->a, vars);
       }
 
@@ -2140,6 +2142,7 @@ static void bc_assign_slots(struct rules_t *obj) {
            gettype(obj->bc.buffer[c]) != OP_SETVAL &&
            !(gettype(obj->bc.buffer[c]) == OP_PUSH && getval(z->c) == 1)) {
           if((int8_t)getval(z->a) == d) {
+            logprintf_P(F("DEBUG loop1: outer type=%d d=%d vars=%d, updating inner type=%d a: %d->%d"), gettype(obj->bc.buffer[a]), d, vars, gettype(obj->bc.buffer[c]), d, vars);
             setval(z->a, vars);
           }
         }
@@ -2152,6 +2155,7 @@ static void bc_assign_slots(struct rules_t *obj) {
             setval(z->b, vars);
           }
           if((int8_t)getval(z->c) == d) {
+            logprintf_P(F("DEBUG loop1: outer type=%d d=%d vars=%d, updating inner type=%d c: %d->%d"), gettype(obj->bc.buffer[a]), d, vars, gettype(obj->bc.buffer[c]), d, vars);
             if((int8_t)getval(z->b) == vars) {
               if((int8_t)getval(z->a) == vars) {
                 if(gettype(obj->bc.buffer[c]) != OP_CLEAR &&
@@ -2235,6 +2239,7 @@ static void bc_assign_slots(struct rules_t *obj) {
              gettype(obj->bc.buffer[c]) != OP_CLEAR &&
              !(gettype(obj->bc.buffer[c]) == OP_PUSH && getval(z->c) == 1)) {
             if((int8_t)getval(z->a) == d) {
+              logprintf_P(F("DEBUG bc_assign: updating node type=%d a: %d->%d"), gettype(obj->bc.buffer[c]), d, e);
               changed = 1;
               setval(z->a, e);
             }
@@ -2255,6 +2260,7 @@ static void bc_assign_slots(struct rules_t *obj) {
              gettype(obj->bc.buffer[c]) != OP_CLEAR &&
              gettype(obj->bc.buffer[c]) != OP_PUSH) {
             if((int8_t)getval(z->c) == d) {
+              logprintf_P(F("DEBUG bc_assign: updating node type=%d c: %d->%d"), gettype(obj->bc.buffer[c]), d, e);
               changed = 1;
               setval(z->c, e);
             }
