@@ -2201,7 +2201,7 @@ static void bc_assign_slots(struct rules_t *obj) {
         if(tmp > 0 && gettype(obj->bc.buffer[a]) == OP_CALL &&
            gettype(obj->bc.buffer[tmp]) != OP_CLEAR) {
           offset++;
-        } else if(gettype(obj->bc.buffer[a]) != OP_PUSH) {
+       } else if(gettype(obj->bc.buffer[a]) != OP_PUSH && gettype(obj->bc.buffer[a]) != OP_GETVAL) {
           int16_t b = (gettype(obj->bc.buffer[a]) == OP_GETVAL) ? vm_val_pos(0) : vm_val_pos((int8_t)getval(x->b));
           int16_t c = vm_val_pos((int8_t)getval(x->c));
 
