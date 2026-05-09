@@ -24,7 +24,10 @@ int8_t rule_function_floor_callback(void) {
   float x = 0, z = 0;
   uint8_t nr = rules_gettop();
 
+  logprintf_P(F("DEBUG floor: stack top count = %d"), nr);
+
   if(nr > 1) {
+    logprintf_P(F("DEBUG floor: FAIL - too many args %d"), nr);
     return -1;
   }
 

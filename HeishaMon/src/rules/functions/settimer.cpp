@@ -26,12 +26,16 @@ int8_t rule_function_set_timer_callback(void) {
   uint16_t sec = 0, nr = 0;
   uint8_t x = rules_gettop();
 
+  logprintf_P(F("DEBUG setTimer: stack top count = %d"), x);
+
   if(x < 2 || x > 2) {
+    logprintf_P(F("DEBUG setTimer: FAIL - wrong arg count %d"), x);
     return -1;
   }
 
   switch(rules_type(-1)) {
     case VNULL: {
+      logprintf_P(F("DEBUG setTimer: sec arg is NULL"));
       rules_remove(-1);
       rules_remove(-1);
       return -1;
@@ -47,6 +51,7 @@ int8_t rule_function_set_timer_callback(void) {
 
   switch(rules_type(-1)) {
     case VNULL: {
+      logprintf_P(F("DEBUG setTimer: nr arg is NULL"));
       rules_remove(-1);
       return -1;
     } break;
@@ -58,6 +63,7 @@ int8_t rule_function_set_timer_callback(void) {
     } break;
   }
 
+  logprintf_P(F("DEBUG setTimer: inserting timer #%d sec=%d"), nr, sec);
   timerqueue_insert(sec, 0, nr);
 
   logprintf_P(F("timer #%d set to %d seconds"), nr, sec);

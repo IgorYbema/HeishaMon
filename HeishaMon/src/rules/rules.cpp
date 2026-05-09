@@ -4913,6 +4913,21 @@ int8_t rule_run(struct rules_t *obj, uint8_t validate) {
       }
 #endif
 
+      {
+        uint8_t ptype = gettype(obj->heap->buffer[a]) & 0x1F;
+        int32_t pval = 0;
+        if(ptype == VINTEGER) {
+          struct vm_vinteger_t *pn = (struct vm_vinteger_t *)&obj->heap->buffer[a];
+          pval |= getval(pn->value[0]) << 16;
+          pval |= getval(pn->value[1]) << 8;
+          pval |= getval(pn->value[2]);
+          if(pval & 0x800000) { pval |= 0xFF000000; }
+          logprintf_P(F("DEBUG PUSH: heap slot %d type=%d val=%d"), (int8_t)getval(node->a), ptype, pval);
+        } else {
+          logprintf_P(F("DEBUG PUSH: heap slot %d type=%d (non-int)"), (int8_t)getval(node->a), ptype);
+        }
+      }
+
       vm_stack_push(a, &obj->heap->buffer[a]);
     } else {
       uint16_t a = (uint8_t)(getval(node->a)-1)*sizeof(struct vm_vchar_t);
@@ -4960,12 +4975,14 @@ int8_t rule_run(struct rules_t *obj, uint8_t validate) {
 #endif
 
     if(c == 0) {
+      logprintf_P(F("DEBUG STEP_CALL: '%s' stack=%d heap_slot=%d"), rule_functions[b].name, rules_gettop(), (int8_t)getval(node->a));
       if(rule_functions[b].callback() != 0) {
         /* LCOV_EXCL_START*/
         logprintf_P(F("FATAL: function call '%s' failed"), rule_functions[b].name);
         return -1;
         /* LCOV_EXCL_STOP*/
       }
+      logprintf_P(F("DEBUG STEP_CALL: '%s' done, stack=%d"), rule_functions[b].name, rules_gettop());
       if(rules_gettop() == 1) {
         switch(rules_type(-1)) {
           case VNULL: {
