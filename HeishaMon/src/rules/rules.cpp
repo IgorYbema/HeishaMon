@@ -4359,6 +4359,8 @@ int8_t rule_run(struct rules_t *obj, uint8_t validate) {
     uint8_t x_type = gettype(obj->heap->buffer[b]);
     uint8_t y_type = gettype(obj->heap->buffer[c]);
 
+    logprintf_P(F("DEBUG OP_MATH: type=%d a=%d b=%d c=%d x_type=%d y_type=%d"), type, (int8_t)getval(node->a), (int8_t)getval(node->b), (int8_t)getval(node->c), x_type, y_type);
+
     if(x_type == VINTEGER) {
       struct vm_vinteger_t *node1 = (struct vm_vinteger_t *)&obj->heap->buffer[b];
       uint32_t val = 0;
@@ -4659,6 +4661,7 @@ int8_t rule_run(struct rules_t *obj, uint8_t validate) {
 
     float x = 0;
     uint8_t x_type = gettype(obj->heap->buffer[a]);
+    logprintf_P(F("DEBUG STEP_TEST: heap slot=%d x_type=%d"), (int8_t)getval(node->a), x_type);
 
     if(x_type == VINTEGER) {
       struct vm_vinteger_t *node1 = (struct vm_vinteger_t *)&obj->heap->buffer[a];
