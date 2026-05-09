@@ -2108,7 +2108,6 @@ static void bc_assign_slots(struct rules_t *obj) {
         z = (struct vm_top_t *)&obj->bc.buffer[e];
       }
 
-      int8_t d_before = (int8_t)getval(x->a);
       if(z != NULL && gettype(x->type) == OP_CALL &&
          gettype(z->type) == OP_PUSH &&
          (int8_t)getval(z->a) >= min) {
@@ -2125,7 +2124,9 @@ static void bc_assign_slots(struct rules_t *obj) {
       if(gettype(obj->bc.buffer[a]) != OP_SETVAL &&
          gettype(obj->bc.buffer[a]) != OP_CLEAR &&
          !(gettype(obj->bc.buffer[a]) == OP_PUSH && getval(x->c) == 1)) {
-        logprintf_P(F("DEBUG loop1: OUTER type=%d old_a=%d -> vars=%d (b=%d c=%d)"), gettype(obj->bc.buffer[a]), d_before, vars, (int8_t)getval(x->b), (int8_t)getval(x->c));
+#ifdef DEBUG
+        logprintf_P(F("DEBUG loop1: OUTER type=%d -> vars=%d (b=%d c=%d)"), gettype(obj->bc.buffer[a]), vars, (int8_t)getval(x->b), (int8_t)getval(x->c));
+#endif
         setval(x->a, vars);
       }
 
@@ -2142,7 +2143,9 @@ static void bc_assign_slots(struct rules_t *obj) {
            gettype(obj->bc.buffer[c]) != OP_SETVAL &&
            !(gettype(obj->bc.buffer[c]) == OP_PUSH && getval(z->c) == 1)) {
           if((int8_t)getval(z->a) == d) {
+#ifdef DEBUG
             logprintf_P(F("DEBUG loop1: outer type=%d d=%d vars=%d, updating inner type=%d a: %d->%d"), gettype(obj->bc.buffer[a]), d, vars, gettype(obj->bc.buffer[c]), d, vars);
+#endif
             setval(z->a, vars);
           }
         }
@@ -2151,11 +2154,15 @@ static void bc_assign_slots(struct rules_t *obj) {
            gettype(obj->bc.buffer[c]) != OP_CLEAR &&
            gettype(obj->bc.buffer[c]) != OP_PUSH) {
           if((int8_t)getval(z->b) == d) {
+#ifdef DEBUG
             logprintf_P(F("DEBUG loop1: outer type=%d d=%d vars=%d, updating inner type=%d b: %d->%d"), gettype(obj->bc.buffer[a]), d, vars, gettype(obj->bc.buffer[c]), d, vars);
+#endif
             setval(z->b, vars);
           }
           if((int8_t)getval(z->c) == d) {
+#ifdef DEBUG
             logprintf_P(F("DEBUG loop1: outer type=%d d=%d vars=%d, updating inner type=%d c: %d->%d"), gettype(obj->bc.buffer[a]), d, vars, gettype(obj->bc.buffer[c]), d, vars);
+#endif
             if((int8_t)getval(z->b) == vars) {
               if((int8_t)getval(z->a) == vars) {
                 if(gettype(obj->bc.buffer[c]) != OP_CLEAR &&
@@ -2206,7 +2213,9 @@ static void bc_assign_slots(struct rules_t *obj) {
         continue;
       }
       if(d >= min) {
+#ifdef DEBUG
         logprintf_P(F("DEBUG bc_assign: node type=%d d=%d offset=%d"), gettype(obj->bc.buffer[a]), d, offset);
+#endif
         if(tmp > 0 && gettype(obj->bc.buffer[a]) == OP_CALL &&
            gettype(obj->bc.buffer[tmp]) != OP_CLEAR) {
           offset++;
@@ -2228,7 +2237,9 @@ static void bc_assign_slots(struct rules_t *obj) {
         }
         first = 0, changed = 0;
         e = vm_val_posr(e);
+#ifdef DEBUG
         logprintf_P(F("DEBUG bc_assign: d=%d -> e=%d (offset=%d)"), d, e, offset);
+#endif
 
         for(c=start;c<=end;c = bc_next(obj, c)) {
           if(c == -1) {
@@ -2239,7 +2250,9 @@ static void bc_assign_slots(struct rules_t *obj) {
              gettype(obj->bc.buffer[c]) != OP_CLEAR &&
              !(gettype(obj->bc.buffer[c]) == OP_PUSH && getval(z->c) == 1)) {
             if((int8_t)getval(z->a) == d) {
+#ifdef DEBUG
               logprintf_P(F("DEBUG bc_assign: updating node type=%d a: %d->%d"), gettype(obj->bc.buffer[c]), d, e);
+#endif
               changed = 1;
               setval(z->a, e);
             }
@@ -2249,7 +2262,9 @@ static void bc_assign_slots(struct rules_t *obj) {
              gettype(obj->bc.buffer[c]) != OP_CLEAR &&
              gettype(obj->bc.buffer[c]) != OP_PUSH) {
             if((int8_t)getval(z->b) == d) {
+#ifdef DEBUG
               logprintf_P(F("DEBUG bc_assign: updating node type=%d b: %d->%d"), gettype(obj->bc.buffer[c]), d, e);
+#endif
               changed = 1;
               setval(z->b, e);
             }
@@ -2260,7 +2275,9 @@ static void bc_assign_slots(struct rules_t *obj) {
              gettype(obj->bc.buffer[c]) != OP_CLEAR &&
              gettype(obj->bc.buffer[c]) != OP_PUSH) {
             if((int8_t)getval(z->c) == d) {
+#ifdef DEBUG
               logprintf_P(F("DEBUG bc_assign: updating node type=%d c: %d->%d"), gettype(obj->bc.buffer[c]), d, e);
+#endif
               changed = 1;
               setval(z->c, e);
             }
@@ -4366,7 +4383,9 @@ int8_t rule_run(struct rules_t *obj, uint8_t validate) {
     uint8_t x_type = gettype(obj->heap->buffer[b]);
     uint8_t y_type = gettype(obj->heap->buffer[c]);
 
+#ifdef DEBUG
     logprintf_P(F("DEBUG OP_MATH: type=%d a=%d b=%d c=%d x_type=%d y_type=%d"), type, (int8_t)getval(node->a), (int8_t)getval(node->b), (int8_t)getval(node->c), x_type, y_type);
+#endif
 
     if(x_type == VINTEGER) {
       struct vm_vinteger_t *node1 = (struct vm_vinteger_t *)&obj->heap->buffer[b];
@@ -4668,7 +4687,9 @@ int8_t rule_run(struct rules_t *obj, uint8_t validate) {
 
     float x = 0;
     uint8_t x_type = gettype(obj->heap->buffer[a]);
+#ifdef DEBUG
     logprintf_P(F("DEBUG STEP_TEST: heap slot=%d x_type=%d"), (int8_t)getval(node->a), x_type);
+#endif
 
     if(x_type == VINTEGER) {
       struct vm_vinteger_t *node1 = (struct vm_vinteger_t *)&obj->heap->buffer[a];
@@ -4830,7 +4851,9 @@ int8_t rule_run(struct rules_t *obj, uint8_t validate) {
     if((int8_t)getval(node->b) < 0) {
       uint16_t a = (int8_t)getval(node->a)*sizeof(struct vm_vchar_t);
       int16_t b = vm_val_pos((int8_t)getval(node->b));
+#ifdef DEBUG
       logprintf_P(F("DEBUG SETVAL: reading from heap slot %d"), (int8_t)getval(node->b));
+#endif
 
 #if defined(DEBUG) || defined(COVERALLS)
       if(b > getval(obj->heap->nrbytes)) {
@@ -4928,6 +4951,7 @@ int8_t rule_run(struct rules_t *obj, uint8_t validate) {
       }
 #endif
 
+#ifdef DEBUG
       {
         uint8_t ptype = gettype(obj->heap->buffer[a]) & 0x1F;
         int32_t pval = 0;
@@ -4942,6 +4966,7 @@ int8_t rule_run(struct rules_t *obj, uint8_t validate) {
           logprintf_P(F("DEBUG PUSH: heap slot %d type=%d (non-int)"), (int8_t)getval(node->a), ptype);
         }
       }
+#endif
 
       vm_stack_push(a, &obj->heap->buffer[a]);
     } else {
@@ -4990,14 +5015,18 @@ int8_t rule_run(struct rules_t *obj, uint8_t validate) {
 #endif
 
     if(c == 0) {
+#ifdef DEBUG
       logprintf_P(F("DEBUG STEP_CALL: '%s' stack=%d heap_slot=%d"), rule_functions[b].name, rules_gettop(), (int8_t)getval(node->a));
+#endif
       if(rule_functions[b].callback() != 0) {
         /* LCOV_EXCL_START*/
         logprintf_P(F("FATAL: function call '%s' failed"), rule_functions[b].name);
         return -1;
         /* LCOV_EXCL_STOP*/
       }
+#ifdef DEBUG
       logprintf_P(F("DEBUG STEP_CALL: '%s' done, stack=%d"), rule_functions[b].name, rules_gettop());
+#endif
       if(rules_gettop() == 1) {
         switch(rules_type(-1)) {
           case VNULL: {
