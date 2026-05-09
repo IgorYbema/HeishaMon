@@ -2198,6 +2198,7 @@ static void bc_assign_slots(struct rules_t *obj) {
         continue;
       }
       if(d >= min) {
+        logprintf_P(F("DEBUG bc_assign: node type=%d d=%d offset=%d"), gettype(obj->bc.buffer[a]), d, offset);
         if(tmp > 0 && gettype(obj->bc.buffer[a]) == OP_CALL &&
            gettype(obj->bc.buffer[tmp]) != OP_CLEAR) {
           offset++;
@@ -2219,6 +2220,7 @@ static void bc_assign_slots(struct rules_t *obj) {
         }
         first = 0, changed = 0;
         e = vm_val_posr(e);
+        logprintf_P(F("DEBUG bc_assign: d=%d -> e=%d (offset=%d)"), d, e, offset);
 
         for(c=start;c<=end;c = bc_next(obj, c)) {
           if(c == -1) {
@@ -2238,6 +2240,7 @@ static void bc_assign_slots(struct rules_t *obj) {
              gettype(obj->bc.buffer[c]) != OP_CLEAR &&
              gettype(obj->bc.buffer[c]) != OP_PUSH) {
             if((int8_t)getval(z->b) == d) {
+              logprintf_P(F("DEBUG bc_assign: updating node type=%d b: %d->%d"), gettype(obj->bc.buffer[c]), d, e);
               changed = 1;
               setval(z->b, e);
             }
@@ -4816,6 +4819,7 @@ int8_t rule_run(struct rules_t *obj, uint8_t validate) {
     if((int8_t)getval(node->b) < 0) {
       uint16_t a = (int8_t)getval(node->a)*sizeof(struct vm_vchar_t);
       int16_t b = vm_val_pos((int8_t)getval(node->b));
+      logprintf_P(F("DEBUG SETVAL: reading from heap slot %d"), (int8_t)getval(node->b));
 
 #if defined(DEBUG) || defined(COVERALLS)
       if(b > getval(obj->heap->nrbytes)) {
