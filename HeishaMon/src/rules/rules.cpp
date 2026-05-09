@@ -2145,6 +2145,7 @@ static void bc_assign_slots(struct rules_t *obj) {
            gettype(obj->bc.buffer[c]) != OP_CLEAR &&
            gettype(obj->bc.buffer[c]) != OP_PUSH) {
           if((int8_t)getval(z->b) == d) {
+            logprintf_P(F("DEBUG loop1: outer type=%d d=%d vars=%d, updating inner type=%d b: %d->%d"), gettype(obj->bc.buffer[a]), d, vars, gettype(obj->bc.buffer[c]), d, vars);
             setval(z->b, vars);
           }
           if((int8_t)getval(z->c) == d) {
