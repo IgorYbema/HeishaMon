@@ -2208,7 +2208,7 @@ static void bc_assign_slots(struct rules_t *obj) {
          (gettype(obj->bc.buffer[a]) == OP_PUSH && d < 0)) {
         continue;
       }
-      if(a == end && gettype(obj->bc.buffer[a]) == OP_SETVAL) {
+      if(gettype(obj->bc.buffer[a]) == OP_SETVAL) {
         continue;
       }
       if(gettype(obj->bc.buffer[a]) == OP_CLEAR) {
