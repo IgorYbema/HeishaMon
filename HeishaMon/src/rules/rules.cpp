@@ -1475,7 +1475,7 @@ static int16_t vm_val_pos(int8_t pos) {
   }
 }
 
-static int32_t vm_val_posr(int8_t pos) {
+static int32_t vm_val_posr(int16_t pos) {
   return ((pos-4)/rule_max_var_bytes()*-1)-1;
 }
 
