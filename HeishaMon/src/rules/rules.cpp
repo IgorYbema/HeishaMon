@@ -2132,6 +2132,10 @@ static void bc_assign_slots(struct rules_t *obj) {
         setval(x->a, vars);
       }
 
+      if(gettype(obj->bc.buffer[a]) == OP_SETVAL) {
+        continue;
+      }
+
       for(c=a;c<=end;c = bc_next(obj, c)) {
         if(c == -1) {
           break;
