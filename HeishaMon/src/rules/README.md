@@ -88,7 +88,12 @@ A flat array of 4-byte slots that hold **runtime values**. Each slot is one of:
 
 Slot 0 (bytes 0–3) is always reserved/empty. Real slots start at byte offset 4.
 
-Heap positions are referenced by negative `int8_t` values in bytecode nodes. Slot at byte offset `N` is addressed as `-(N/4)`. The helpers `vm_val_pos(n)` and `vm_val_posr(pos)` convert between these two representations.
+Heap positions are referenced by negative `int8_t` values in bytecode nodes (`a`, `b`, `c` fields of `vm_top_t`). Slot at byte offset `N` is addressed as `-(N/4)`. The helpers `vm_val_pos(n)` and `vm_val_posr(pos)` convert between these two representations.
+
+- `vm_val_pos(slot)` — negative slot number → byte offset: `(-slot - 1) * 4 + 4`
+- `vm_val_posr(offset)` — byte offset → negative slot number. The parameter is `int16_t` (not `int8_t`) because heap byte offsets can exceed 127 for complex rules.
+
+The slot numbers stored in `vm_top_t` fields are `int8_t` (range −1 to −128), giving a theoretical maximum of 128 heap slots (512 bytes). In practice, complex rules approach but stay well within this limit.
 
 ---
 
@@ -141,7 +146,7 @@ Fields `a`, `b`, `c` have **context-dependent meanings** per opcode:
 |---|---|---|---|
 | Math op (ADD, NE, …) | result heap slot (negative) | left operand heap slot (negative) | right operand heap slot (negative) |
 | OP_GETVAL | output heap slot (negative after compile) | varstack slot index | — |
-| OP_SETVAL | — (unused at runtime) | source heap slot (negative) | varstack slot index |
+| OP_SETVAL | varstack slot index | source heap slot (negative) | — |
 | OP_PUSH | heap slot to push (negative) or varstack index (positive) | — | flag: 1 = varstack, 0 = heap |
 | OP_CALL | result heap slot (negative) | function index | 0 = call, 1 = already done |
 | OP_TEST | condition heap slot (negative) | — | — |
@@ -150,6 +155,8 @@ Fields `a`, `b`, `c` have **context-dependent meanings** per opcode:
 | OP_RET | — | — | — |
 
 During compilation, `a`, `b`, `c` hold **positive virtual slot numbers**. After `bc_assign_slots` runs, they are replaced by **negative heap slot numbers**.
+
+**Exception — OP_SETVAL**: the `a` field always holds a varstack index (a small positive integer identifying which variable to write). It is never a virtual slot and is never rewritten by `bc_assign_slots`. The `b` field is converted from virtual to real heap slot normally. This distinction — `a` being a variable index, not a slot reference — is critical for `bc_assign_slots` to work correctly.
 
 ---
 
@@ -266,7 +273,8 @@ Special cases:
 - **OP_GETVAL**: always gets the next decrement (`vars--`), straightforwardly.
 - **OP_CALL preceded by OP_PUSH in range**: `vars--` so CALL gets its own unique slot (Fix 1).
 - **Math/comparison ops with operands already assigned**: `vars = MAX(operands) - 1` so the result slot is below both operands (Fix 3).
-- **OP_SETVAL / OP_CLEAR**: skipped — they don't produce a heap result.
+- **OP_SETVAL**: the `vars--` counter still runs (so slot numbering stays consistent), but `setval(x->a, vars)` is skipped (because `a` is a variable index, not a slot) **and the inner scan is also skipped** (Fix 5a). If the inner scan ran, it would use SETVAL's variable index as if it were a virtual slot number and corrupt any other node that happened to hold the same value in its fields.
+- **OP_CLEAR**: skipped entirely — it has no slot to assign.
 
 #### Second loop — map virtual → real heap slots
 
@@ -278,6 +286,10 @@ Walks the range in bytecode order. For each node with a virtual slot `d >= min`:
 4. Increments `offset` so the next node gets a fresh heap position.
 
 Key detail: `offset` is declared **outside** the `while(1)` range loop so it accumulates across ranges and different ranges don't collide on the same heap slots (Fix 2). Within each range, `offset` always increments unconditionally after each outer node so that even isolated nodes (like a PUSH with no dependents) get a unique slot.
+
+**OP_SETVAL is always skipped as an outer node** (Fix 5b). Even though SETVAL appears in the bytecode and is iterated over, it must not be treated as the "current outer" because its `a` field is a variable index, not a virtual slot. If it were processed, the second loop would call `vm_heap_next` and allocate a heap slot for what is actually a variable number, then scan all nodes and overwrite any that coincidentally hold the same value in their `a` field — including the NE result slot, which would then be skipped when the second loop reached it (since its `a` would already appear negative).
+
+**`vm_val_posr` takes `int16_t`** (Fix 4). The function receives a byte offset from `vm_heap_next` (which can be up to ~500 bytes for complex rules). If the parameter were `int8_t`, byte offsets ≥ 128 would silently overflow to a negative value, causing the formula to produce a *positive* slot number. Positive slot numbers in `a`/`b`/`c` fields are invalid at runtime and cause an immediate fatal error.
 
 The VNULL-preservation check (`if heap[b] == VNULL && first == 1`) adds an extra `offset` increment when the first node in a range has operands that are already NULL — this preserves unset variables as NULL rather than silently aliasing them.
 
@@ -440,3 +452,21 @@ In the first loop, when `OP_CALL` was preceded by `OP_PUSH` with a slot already 
 **Bug 3 — Comparison op result aliased an operand slot (Fix 3)**
 
 In the first loop, when a comparison op (NE) had operands at virtual slots `b` and `c`, the code set `vars = MAX(b, c)` without decrementing. NE's result slot ended up equal to its own operand slot. This was actually harmless for this specific rule because the second loop maps both to the same heap slot and the execution order guarantees the operand is read before the result is written — but it was still incorrect and masked a deeper issue with how the first loop tracks slot identity.
+
+**Bug 4 — `vm_val_posr` int8_t overflow for heaps > 127 bytes (Fix 4)**
+
+`vm_val_posr` converts a heap byte offset back to a negative slot number. Its parameter was declared `int8_t`. For complex rules, `vm_heap_next` returns byte offsets ≥ 128 (e.g. slot −32 lives at byte 128). Passing 128 to an `int8_t` parameter silently wraps to −128, and the formula `(−128 − 4) / 4 * −1 − 1 = 32` produces a *positive* slot number. A positive value in any `a`/`b`/`c` field is invalid; the VM catches it immediately and raises a fatal error. The fix changes the parameter to `int16_t`.
+
+This bug is triggered by any rule complex enough to need more than ~31 temporary computation slots (heap byte offset ≥ 128). The bc_assign bugs from fixes 1–3 also inflated the heap artificially (by failing to reuse slots, forcing extra `vm_heap_push` calls), which made this threshold easier to hit.
+
+**Bug 5 — SETVAL variable index treated as virtual slot (Fix 5a + 5b)**
+
+When a rule contains a variable assignment (`$X = expr`) that is not the last node in a bytecode range — for example, when a `setTimer()` call follows the assignment — SETVAL ends up in the *middle* of a range rather than at its end.
+
+The bug had two parts:
+
+*5a — loop1 inner scan (Fix 5a)*: The first loop would process SETVAL as an outer node, read its `a` field (the variable index, e.g. 3), and then scan all later nodes for any that held the value 3 in their own fields. Any such node got its field updated to the "new virtual slot" — including NE's result slot, which coincidentally was also 3. NE's result slot was overwritten to a different value, and when the first loop later processed NE as outer, NE correctly wrote its own slot. But in the second loop, bc_assign saw NE's `a` already as negative (from a previous mapping step), skipped NE, and left NE's `b` operand unmapped (still a positive virtual slot). At runtime the VM's `b ≥ 0` guard fires and crashes.
+
+*5b — second loop outer processing (Fix 5b)*: Even with 5a fixed, the second loop would also process SETVAL as an outer node. It would call `vm_heap_next` and allocate a real heap slot for the variable index (3), then update any node with a matching field to that heap slot — again corrupting NE's `a`.
+
+The fix: in loop1, skip the inner scan when the current node is SETVAL (but still decrement `vars` so the slot counter stays correct). In the second loop, skip SETVAL entirely as an outer node. SETVAL's `b` field is correctly mapped when the upstream math op (e.g. OP_ADD) is processed as outer.
