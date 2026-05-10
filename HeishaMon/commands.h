@@ -28,6 +28,7 @@ extern const char* mqtt_logtopic;
 extern const char* mqtt_willtopic;
 extern const char* mqtt_iptopic;
 extern const char* mqtt_send_raw_value_topic;
+extern const char* mqtt_topic_rules;
 
 unsigned int set_heatpump_state(char *msg, unsigned char *cmd, char *log_msg);
 unsigned int set_pump(char *msg, unsigned char *cmd, char *log_msg);

@@ -124,6 +124,12 @@ char mqtt_topic[256];
 
 static int mqttReconnects = 0;
 
+#define RULES_STATUS_NO_RULES        0
+#define RULES_STATUS_COMPILE_ERROR   1
+#define RULES_STATUS_CRASH_RECOVERY  2
+#define RULES_STATUS_RUNNING         3
+static uint8_t rules_engine_status = RULES_STATUS_NO_RULES;
+
 // can't have too much in buffer due to memory shortage
 #define MAXCOMMANDSINBUFFER 10
 
@@ -495,6 +501,7 @@ void mqtt_reconnect()
         sprintf_P(mqtt_topic, PSTR("%s/%s/WatthourTotal/2"), heishamonSettings.mqtt_topic_base, mqtt_topic_s0);
         mqtt_client.subscribe(mqtt_topic);
       }
+      publishRulesStatus();
       if (mqttReconnects == 1) { //only resend all data on first connect to mqtt so a data bomb like and bad mqtt server will not cause a reconnect bomb everytime
         if (heishamonSettings.use_1wire) resetlastalldatatime_dallas(); //resend all 1wire values to mqtt
         resetlastalldatatime(); //resend all heatpump values to mqtt
@@ -596,6 +603,18 @@ void mqttPublish(char* topic, char* subtopic, char* value, bool retain) {
   char mqtt_topic[256];
   sprintf_P(mqtt_topic, PSTR("%s/%s/%s"), heishamonSettings.mqtt_topic_base, topic, subtopic);
   mqtt_client.publish(mqtt_topic, value, retain);
+}
+
+void publishRulesStatus() {
+  if (!mqtt_client.connected()) return;
+  const char *status_str;
+  switch (rules_engine_status) {
+    case RULES_STATUS_COMPILE_ERROR:  status_str = "not running: compilation error"; break;
+    case RULES_STATUS_CRASH_RECOVERY: status_str = "not running: crash recovery"; break;
+    case RULES_STATUS_RUNNING:        status_str = "running"; break;
+    default:                          status_str = "no rules installed"; break;
+  }
+  mqttPublish((char*)mqtt_topic_rules, _F("status"), (char*)status_str);
 }
 
 
@@ -1678,14 +1697,18 @@ void timer_cb(int nr) {
             LittleFS.remove("/rules.txt");
             LittleFS.remove("/rules.new");
             rules_deinitialize();
+            rules_engine_status = RULES_STATUS_NO_RULES;
           } else if (ret == -1) {
             log_message(_F("Failed to load new rules, reverting back to older rules!"));
-            rules_parse((char*)"/rules.txt");
+            ret = rules_parse((char*)"/rules.txt");
+            rules_engine_status = (ret == 0) ? RULES_STATUS_RUNNING : (ret == -1 ? RULES_STATUS_COMPILE_ERROR : RULES_STATUS_NO_RULES);
           } else {
             if (LittleFS.begin()) {
               LittleFS.rename("/rules.new", "/rules.txt");
             }
+            rules_engine_status = RULES_STATUS_RUNNING;
           }
+          publishRulesStatus();
           rules_boot();
         } break;
       case -5: {
@@ -1847,12 +1870,15 @@ void setup() {
     if (reset_reason > 3 && reset_reason < 12) {  //is this correct for esp32?
 #endif  
         loggingSerial.println("Not loading rules due to crash reboot!");
+        rules_engine_status = RULES_STATUS_CRASH_RECOVERY;
     } else {
-      rules_parse((char *)"/rules.txt");
+      int rp_ret = rules_parse((char *)"/rules.txt");
+      rules_engine_status = (rp_ret == 0) ? RULES_STATUS_RUNNING : (rp_ret == -1 ? RULES_STATUS_COMPILE_ERROR : RULES_STATUS_NO_RULES);
       rules_boot();
     }
   } else {
-    rules_parse((char *)"/rules.txt");
+    int rp_ret = rules_parse((char *)"/rules.txt");
+    rules_engine_status = (rp_ret == 0) ? RULES_STATUS_RUNNING : (rp_ret == -1 ? RULES_STATUS_COMPILE_ERROR : RULES_STATUS_NO_RULES);
     rules_boot();
   }
 

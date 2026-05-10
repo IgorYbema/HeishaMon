@@ -23,6 +23,7 @@ const char* mqtt_willtopic PROGMEM = "LWT";
 const char* mqtt_iptopic PROGMEM = "ip";
 
 const char* mqtt_send_raw_value_topic PROGMEM = "SendRawValue";
+const char* mqtt_topic_rules PROGMEM = "rules";
 
 static unsigned int temp2hex(float temp) {
   int hextemp = 0;
