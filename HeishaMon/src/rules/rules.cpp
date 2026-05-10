@@ -6,8 +6,6 @@
   file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
-#define DEBUG
-
 #if defined(ESP8266) || defined(ESP32)
   #pragma GCC diagnostic warning "-fpermissive"
 #endif
