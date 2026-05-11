@@ -2015,6 +2015,7 @@ static void bc_assign_slots(struct rules_t *obj) {
   int32_t a = 0, c = 0;
   uint16_t start = 0, end = 0, tmp = 0;
   uint8_t vars = 0, min = 0, max = 0, changed = 0;
+  uint8_t offset = 0;
 
   while(1) {
     vars = 0, min = 0, max = 0, a = 0, c = 0, start = 0;
@@ -2114,6 +2115,7 @@ static void bc_assign_slots(struct rules_t *obj) {
       } else if(gettype(x->type) != OP_GETVAL &&
          (((int8_t)getval(x->b) >= vars || (int8_t)getval(x->c) >= vars))) {
         vars = MAX((int8_t)getval(x->c), (int8_t)getval(x->b));
+        vars--;
       } else {
         vars--;
       }
@@ -2190,7 +2192,6 @@ static void bc_assign_slots(struct rules_t *obj) {
     /*
      * Reassign NULL slots to heap slots
      */
-    uint8_t offset = 0;
     uint8_t first = 1;
     int32_t e = 0;
     for(a=start;a<=end;a = bc_next(obj, a)) {
@@ -2286,9 +2287,7 @@ static void bc_assign_slots(struct rules_t *obj) {
             }
           }
         }
-	if (changed == 1) {
-          offset++;
-	}
+        offset++;
       }
     }
     end = bc_next(obj, end);
