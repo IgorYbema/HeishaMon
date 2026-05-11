@@ -2110,7 +2110,7 @@ static void bc_assign_slots(struct rules_t *obj) {
       if(z != NULL && gettype(x->type) == OP_CALL &&
          gettype(z->type) == OP_PUSH &&
          (int8_t)getval(z->a) >= min) {
-        vars--;
+        //do nothing 
       } else if(gettype(x->type) != OP_GETVAL &&
          (((int8_t)getval(x->b) >= vars || (int8_t)getval(x->c) >= vars))) {
         vars = MAX((int8_t)getval(x->c), (int8_t)getval(x->b));
@@ -2222,7 +2222,7 @@ static void bc_assign_slots(struct rules_t *obj) {
         if(tmp > 0 && gettype(obj->bc.buffer[a]) == OP_CALL &&
            gettype(obj->bc.buffer[tmp]) != OP_CLEAR) {
           offset++;
-        } else if(gettype(obj->bc.buffer[a]) != OP_PUSH && gettype(obj->bc.buffer[a]) != OP_CALL) {
+        } else if(gettype(obj->bc.buffer[a]) != OP_PUSH) {
           int16_t b = vm_val_pos((int8_t)getval(x->b));
           int16_t c = vm_val_pos((int8_t)getval(x->c));
 
