@@ -76,7 +76,7 @@ jobs:
         shell: bash
 
       - name: Compile Sketch for ESP32
-        run: cd HeishaMon && arduino-cli compile --output-dir . --fqbn=esp32:esp32:esp32s3:CDCOnBoot=cdc,PSRAM=enabled,PartitionScheme=min_spiffs --warnings=none --verbose HeishaMon.ino
+        run: cd HeishaMon && arduino-cli compile --output-dir . --fqbn=esp32:esp32:esp32s3:CDCOnBoot=cdc,PSRAM=enabled,PartitionScheme=min_spiffs --warnings=none --build-property "compiler.cpp.extra_flags=-DDEBUG" --verbose HeishaMon.ino
 
       - name: Add MD5 checksum to ESP32 binary
         run: |
