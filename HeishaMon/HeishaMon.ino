@@ -500,7 +500,7 @@ void mqtt_reconnect()
         resetlastalldatatime(); //resend all heatpump values to mqtt
       }
       //use this to receive valid heishamon raw data from other heishamon to debug this OT code
-//#define RAWDEBUG
+#define RAWDEBUG
 #ifdef RAWDEBUG
       if ( heishamonSettings.listenonly) {
         mqtt_client.subscribe((char*)"panasonic_heat_pump/raw/data"); //subscribe to raw heatpump data over MQTT
