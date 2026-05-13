@@ -6,6 +6,7 @@
   file, You can obtain one at http://mozilla.org/MPL/2.0/.
 */
 
+#define DEBUG
 
 #ifndef _RULES_H_
 #define _RULES_H_
