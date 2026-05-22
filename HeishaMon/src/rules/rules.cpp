@@ -2024,6 +2024,7 @@ static void bc_assign_slots(struct rules_t *obj) {
       }
     }
     end = a;
+    start = end;
 
     for(a=end;a<getval(obj->bc.nrbytes);a = bc_next(obj, a)) {
       if(a == -1) {
@@ -2200,6 +2201,9 @@ static void bc_assign_slots(struct rules_t *obj) {
         continue;
       }
       if(gettype(obj->bc.buffer[a]) == OP_CLEAR) {
+        continue;
+      }
+      if(gettype(obj->bc.buffer[a]) == OP_CALL && getval(x->a) == 0) {
         continue;
       }
       if(d >= min) {
