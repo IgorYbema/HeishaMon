@@ -1052,12 +1052,16 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
           client->route = 1;
           log_message(_F("Toggled hexdump log flag"));
           heishamonSettings.logHexdump ^= true;
-        } else if (strcmp_P((char *)dat, PSTR("/hotspot-detect.html")) == 0 ||
+        } else if (strcmp_P((char *)dat, PSTR("/connecttest.txt")) == 0 ||
+                   strcmp_P((char *)dat, PSTR("/ncsi.txt")) == 0 ||
+                   strcmp_P((char *)dat, PSTR("/redirect")) == 0 ||
                    strcmp_P((char *)dat, PSTR("/fwlink")) == 0 ||
                    strcmp_P((char *)dat, PSTR("/generate_204")) == 0 ||
                    strcmp_P((char *)dat, PSTR("/gen_204")) == 0 ||
                    strcmp_P((char *)dat, PSTR("/popup")) == 0) {
-          client->route = 80;
+          client->route = 80; //for Android/Windows devices
+        } else if (strcmp_P((char *)dat, PSTR("/hotspot-detect.html")) == 0 ) {
+          client->route = 81;  //for Apple devices
         } else if (strcmp_P((char *)dat, PSTR("/factoryreset")) == 0) {
           client->route = 90;
         } else if (strcmp_P((char *)dat, PSTR("/command")) == 0) {
@@ -1280,8 +1284,25 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
               return 0;
             } break;
           case 80: {
-              return handleSettings(client);
+              if (client->content == 0) {
+                webserver_send(client, 302, (char *)"text/html", 0);
+              }
+              return 0;
             } break;
+          case 81: {
+              if (client->content == 0) {
+                const char body[] PROGMEM = 
+                  "<HTML><HEAD><TITLE>HeishaMon Setup</TITLE>"
+                  "<META name='viewport' content='width=device-width,initial-scale=1'>"
+                  "</HEAD><BODY>"
+                  "<h2>HeishaMon Setup</h2>"
+                  "<p><a href='http://192.168.4.1/settings'>Open Settings</a></p>"
+                  "</BODY></HTML>";
+                webserver_send(client, 200, (char *)"text/html", strlen(body));
+                webserver_send_content_P(client, body, strlen(body));
+              }
+              return 0;
+            } break;            
           case 90: {
               return handleFactoryReset(client);
             } break;
@@ -1410,6 +1431,11 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
               header->ptr += sprintf_P((char *)header->buffer, PSTR("Location: /"));
               return -1;
             } break;
+          case 80: {
+              header->ptr += sprintf_P((char *)header->buffer, 
+              PSTR("Location: http://192.168.4.1/settings"));
+              return -1;
+            } break;            
           case 170: {
               header->ptr += sprintf_P((char *)header->buffer, PSTR("Location: /rules"));
               return -1;
