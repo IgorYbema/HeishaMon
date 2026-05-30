@@ -54,7 +54,7 @@ unsigned int set_heatpump_state(char *msg, unsigned char *cmd, char *log_msg) {
 
   {
     char tmp[256] = { 0 };
-    snprintf_P(tmp, 255, PSTR("set heatpump state to %d"), heatpump_state);
+    snprintf_P(tmp, 255, PSTR("set heatpump state to %d"), heatpump_state - 1);
     memcpy(log_msg, tmp, sizeof(tmp));
   }
 
@@ -77,7 +77,7 @@ unsigned int set_pump(char *msg, unsigned char *cmd, char *log_msg) {
 
   {
     char tmp[256] = { 0 };
-    snprintf_P(tmp, 255, PSTR("set pump state to %d"), pump_state);
+    snprintf_P(tmp, 255, PSTR("set pump state to %d"), (pump_state / 16) - 1);
     memcpy(log_msg, tmp, sizeof(tmp));
   }
 
@@ -278,7 +278,7 @@ unsigned int set_force_DHW(char *msg, unsigned char *cmd, char *log_msg) {
 
   {
     char tmp[256] = { 0 };
-    snprintf_P(tmp, 255, PSTR("set force DHW mode to %d"), force_DHW_mode);
+    snprintf_P(tmp, 255, PSTR("set force DHW mode to %d"), (force_DHW_mode / 64) - 1);
     memcpy(log_msg, tmp, sizeof(tmp));
   }
 
@@ -301,7 +301,7 @@ unsigned int set_force_defrost(char *msg, unsigned char *cmd, char *log_msg) {
 
   {
     char tmp[256] = { 0 };
-    snprintf_P(tmp, 255, PSTR("set force defrost mode to %d"), force_defrost_mode);
+    snprintf_P(tmp, 255, PSTR("set force defrost mode to %d"), force_defrost_mode / 2);
     memcpy(log_msg, tmp, sizeof(tmp));
   }
 
@@ -324,7 +324,7 @@ unsigned int set_force_sterilization(char *msg, unsigned char *cmd, char *log_ms
 
   {
     char tmp[256] = { 0 };
-    snprintf_P(tmp, 255, PSTR("set force sterilization mode to %d"), force_sterilization_mode);
+    snprintf_P(tmp, 255, PSTR("set force sterilization mode to %d"), force_sterilization_mode / 4);
     memcpy(log_msg, tmp, sizeof(tmp));
   }
 
@@ -347,7 +347,7 @@ unsigned int set_holiday_mode(char *msg, unsigned char *cmd, char *log_msg) {
 
   {
     char tmp[256] = { 0 };
-    snprintf_P(tmp, 255, PSTR("set holiday mode to %d"), set_holiday);
+    snprintf_P(tmp, 255, PSTR("set holiday mode to %d"), (set_holiday / 16) - 1);
     memcpy(log_msg, tmp, sizeof(tmp));
   }
 
@@ -441,7 +441,7 @@ unsigned int set_bivalent_control(char *msg, unsigned char *cmd, char *log_msg) 
 
   {
     char tmp[256] = { 0 };
-    snprintf_P(tmp, 255, PSTR("set bivalent control to %d"), set_bivalent_control_string.toInt());
+    snprintf_P(tmp, 255, PSTR("set bivalent control to %d"), set_bcontrol - 1);
     memcpy(log_msg, tmp, sizeof(tmp));
   }
 
@@ -467,7 +467,7 @@ unsigned int set_bivalent_mode(char *msg, unsigned char *cmd, char *log_msg) {
   }
   {
     char tmp[256] = { 0 };
-    snprintf_P(tmp, 255, PSTR("set bivalent mode to %d"), set_bivalent_mode_string.toInt());
+    snprintf_P(tmp, 255, PSTR("set bivalent mode to %d"), (set_bmode / 4) - 1);
     memcpy(log_msg, tmp, sizeof(tmp));
   }
 
@@ -693,7 +693,7 @@ unsigned int set_main_schedule(char *msg, unsigned char *cmd, char *log_msg) {
 
   {
     char tmp[256] = { 0 };
-    snprintf_P(tmp, 255, PSTR("set main schedule to %d"), byteValue);
+    snprintf_P(tmp, 255, PSTR("set main schedule to %d"), (byteValue / 64) - 1);
     memcpy(log_msg, tmp, sizeof(tmp));
   }
 
