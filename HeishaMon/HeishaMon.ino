@@ -1291,7 +1291,7 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
             } break;
           case 81: {
               if (client->content == 0) {
-                const char body[] PROGMEM = 
+                static const char body[] PROGMEM =
                   "<HTML><HEAD><TITLE>HeishaMon Setup</TITLE>"
                   "<META name='viewport' content='width=device-width,initial-scale=1'>"
                   "</HEAD><BODY>"
