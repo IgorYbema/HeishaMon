@@ -3378,6 +3378,14 @@ static int16_t rule_create(char **text, struct rules_t *obj) {
                   return -1;
                   /* LCOV_EXCL_STOP*/
                 }
+                /*
+                 * A call/expression statement closes this if-block. Reset the
+                 * temporary slot counter so a following sibling if-condition
+                 * starts fresh. Otherwise mathcnt leaks across the block and
+                 * bc_parse_math_order's backward slot search overshoots into
+                 * this block, relocating its trailing logical operator (#894).
+                 */
+                mathcnt = 0;
                 go = TEND;
                 ret = TIF;
                 continue;
