@@ -12,12 +12,14 @@ void setupGPIO(gpioSettingsStruct gpioSettings) {
 }
 
 void mqttGPIOCallback(char* topic, char* value) {
-  log_message(_F("GPIO: MQTT message received"));
-#ifdef ESP32  
-  if (strcmp_P(PSTR("relay/one"), topic) == 0) {
+  char log_msg[256];
+  sprintf_P(log_msg, PSTR("GPIO: MQTT message received on subtopic '%s' value '%s'"), topic, value);
+  log_message(log_msg);
+#ifdef ESP32
+  if (strcmp_P(topic, PSTR("relay/one")) == 0) {
     log_message(_F("GPIO: MQTT message received 'relay/one'"));
     digitalWrite(relayOnePin,((stricmp((char*)"true", value) == 0) || (stricmp((char*)"on", value) == 0)  || (stricmp((char*)"enable", value) == 0)|| (String(value).toInt() == 1 )));
-  } else if (strcmp_P(PSTR("relay/two"), topic) == 0) {
+  } else if (topic,strcmp_P(PSTR("relay/two")) == 0) {
     log_message(_F("GPIO: MQTT message received 'relay/two'"));
     digitalWrite(relayTwoPin,((stricmp((char*)"true", value) == 0) || (stricmp((char*)"on", value) == 0)  || (stricmp((char*)"enable", value) == 0)|| (String(value).toInt() == 1 )));
   }
