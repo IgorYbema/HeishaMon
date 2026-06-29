@@ -19,7 +19,7 @@ void mqttGPIOCallback(char* topic, char* value) {
   if (strcmp_P(topic, PSTR("relay/one")) == 0) {
     log_message(_F("GPIO: MQTT message received 'relay/one'"));
     digitalWrite(relayOnePin,((stricmp((char*)"true", value) == 0) || (stricmp((char*)"on", value) == 0)  || (stricmp((char*)"enable", value) == 0)|| (String(value).toInt() == 1 )));
-  } else if (topic,strcmp_P(PSTR("relay/two")) == 0) {
+  } else if (strcmp_P(topic,PSTR("relay/two")) == 0) {
     log_message(_F("GPIO: MQTT message received 'relay/two'"));
     digitalWrite(relayTwoPin,((stricmp((char*)"true", value) == 0) || (stricmp((char*)"on", value) == 0)  || (stricmp((char*)"enable", value) == 0)|| (String(value).toInt() == 1 )));
   }
