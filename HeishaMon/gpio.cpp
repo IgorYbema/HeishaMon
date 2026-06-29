@@ -15,6 +15,16 @@ void mqttGPIOCallback(char* topic, char* value) {
   char log_msg[256];
   sprintf_P(log_msg, PSTR("GPIO: MQTT message received on subtopic '%s' value '%s'"), topic, value);
   log_message(log_msg);
+
+    // --- diagnostic: dump exact topic bytes/length before the strcmp ---
+    size_t tlen = strlen(topic);
+    int n = sprintf_P(log_msg, PSTR("GPIO: topic len=%u bytes:"), (unsigned)tlen);
+    for (size_t i = 0; i < tlen && n < (int)sizeof(log_msg) - 4; i++) {
+      n += sprintf(log_msg + n, " %02X", (unsigned char)topic[i]);
+    }
+    log_message(log_msg);
+    // -------------------------------------------------------------------
+  
 #ifdef ESP32
   log_message(_F("GPIO: Does it even go here?'"));
   if (strcmp_P(topic, PSTR("relay/one")) == 0) {
