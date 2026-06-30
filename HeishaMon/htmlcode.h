@@ -1070,101 +1070,47 @@ function buildRow(item,idKey){
 
 static const char consoleTogglesJS[] FLASHPROG = R"====(
 <script>
-// Session cookie helpers
-function setSessionCookie(name, value) {
-  document.cookie = name + "=" + value + "; path=/; SameSite=Strict";
-}
-
-function getSessionCookie(name) {
-  var nameEQ = name + "=";
-  var ca = document.cookie.split(';');
-  for(var i = 0; i < ca.length; i++) {
-    var c = ca[i];
-    while (c.charAt(0) == ' ') c = c.substring(1, c.length);
-    if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
-  }
-  return null;
-}
-
-// Initialize console toggles from session cookies or fetch from server
-function initConsoleToggles() {
-  var mqttLogState = getSessionCookie('mqttLog');
-  var hexdumpState = getSessionCookie('hexdump');
-  
-  if (mqttLogState !== null && hexdumpState !== null) {
-    // Use cached session state
-    document.getElementById('mqttLogToggle').checked = (mqttLogState === 'true');
-    document.getElementById('hexdumpToggle').checked = (hexdumpState === 'true');
-  } else {
-    // First visit in session - fetch from server
-    fetch('/getsettings')
-      .then(function(response) { return response.json(); })
-      .then(function(data) {
-        var mqttEnabled = (data.logMqtt === 'enabled' || data.logMqtt === 1);
-        var hexdumpEnabled = (data.logHexdump === 'enabled' || data.logHexdump === 1);
-        
-        document.getElementById('mqttLogToggle').checked = mqttEnabled;
-        document.getElementById('hexdumpToggle').checked = hexdumpEnabled;
-        
-        // Store in session cookies
-        setSessionCookie('mqttLog', mqttEnabled);
-        setSessionCookie('hexdump', hexdumpEnabled);
-      })
-      .catch(function(err) {
-        console.error('Failed to fetch settings:', err);
-      });
-  }
-}
-
-// Toggle MQTT log
-function toggleMqttLog() {
-  var toggle = document.getElementById('mqttLogToggle');
-  var enabled = toggle.checked;
-  
-  // Update session cookie
-  setSessionCookie('mqttLog', enabled);
-  
-  // Call server endpoint
-  fetch('/togglelog')
-    .then(function(response) {
-      if (!response.ok) {
-        console.error('Failed to toggle MQTT log');
-        // Revert toggle on error
-        toggle.checked = !enabled;
-        setSessionCookie('mqttLog', !enabled);
-      }
+// Refresh both console toggles from the live device state.
+// The device's runtime flags are the source of truth: they reset on reboot to
+// the "from start" settings and are flipped by /togglelog and /togglehexdump.
+// Reading /getsettings after every change keeps the switches in sync with the
+// device instead of with a (possibly stale) browser-side cache.
+function refreshConsoleToggles() {
+  return fetch('/getsettings')
+    .then(function(response) { return response.json(); })
+    .then(function(data) {
+      var mqttEnabled = (data.logMqtt === 'enabled' || data.logMqtt === 1);
+      var hexdumpEnabled = (data.logHexdump === 'enabled' || data.logHexdump === 1);
+      document.getElementById('mqttLogToggle').checked = mqttEnabled;
+      document.getElementById('hexdumpToggle').checked = hexdumpEnabled;
     })
     .catch(function(err) {
-      console.error('Error toggling MQTT log:', err);
-      // Revert toggle on error
-      toggle.checked = !enabled;
-      setSessionCookie('mqttLog', !enabled);
+      console.error('Failed to fetch settings:', err);
     });
 }
 
-// Toggle Hexdump log
+function initConsoleToggles() {
+  refreshConsoleToggles();
+}
+
+// Toggle MQTT log, then re-read the device state so the switch reflects the
+// actual resulting position (the endpoint flips the flag server-side).
+function toggleMqttLog() {
+  fetch('/togglelog')
+    .then(function() { refreshConsoleToggles(); })
+    .catch(function(err) {
+      console.error('Error toggling MQTT log:', err);
+      refreshConsoleToggles();
+    });
+}
+
+// Toggle Hexdump log, then re-read the device state (see toggleMqttLog).
 function toggleHexdump() {
-  var toggle = document.getElementById('hexdumpToggle');
-  var enabled = toggle.checked;
-  
-  // Update session cookie
-  setSessionCookie('hexdump', enabled);
-  
-  // Call server endpoint
   fetch('/togglehexdump')
-    .then(function(response) {
-      if (!response.ok) {
-        console.error('Failed to toggle hexdump');
-        // Revert toggle on error
-        toggle.checked = !enabled;
-        setSessionCookie('hexdump', !enabled);
-      }
-    })
+    .then(function() { refreshConsoleToggles(); })
     .catch(function(err) {
       console.error('Error toggling hexdump:', err);
-      // Revert toggle on error
-      toggle.checked = !enabled;
-      setSessionCookie('hexdump', !enabled);
+      refreshConsoleToggles();
     });
 }
 
