@@ -950,11 +950,14 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
     }
     msg[length] = '\0';
 
-	//also copy topic because a futher mqtt_publish can overwrite the topic memory location
-    char topicbuf[128];
-    strlcpy(topicbuf, topic, sizeof(topicbuf));
- 
-	char* topic_command = topicbuf + strlen(heishamonSettings.mqtt_topic_base) + 1; //strip base plus seperator from topic
+    // copy topic to the heap so a later mqtt publish can't clobber PubSubClient's buffer
+    char* topiccopy = (char*) malloc(strlen(topic) + 1);
+    if (topiccopy) {
+      memcpy(topiccopy, topic, strlen(topic) + 1);
+    }
+	  
+	  
+	char* topic_command = topiccopy + strlen(heishamonSettings.mqtt_topic_base) + 1; //strip base plus seperator from topic
     if (strcmp(topic_command, mqtt_send_raw_value_topic) == 0)
     { // send a raw hex string
       byte *rawcommand;
