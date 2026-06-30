@@ -954,7 +954,7 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
     char topicbuf[128];
     strlcpy(topicbuf, topic, sizeof(topicbuf));
  
-	char* topic_command = topic + strlen(heishamonSettings.mqtt_topic_base) + 1; //strip base plus seperator from topic
+	char* topic_command = topicbuf + strlen(heishamonSettings.mqtt_topic_base) + 1; //strip base plus seperator from topic
     if (strcmp(topic_command, mqtt_send_raw_value_topic) == 0)
     { // send a raw hex string
       byte *rawcommand;
