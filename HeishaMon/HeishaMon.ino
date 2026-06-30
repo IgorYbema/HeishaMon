@@ -951,10 +951,10 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
     msg[length] = '\0';
 
 	//also copy topic because a futher mqtt_publish can overwrite the topic memory location
-    char topicbuf[strlen(topic) + 1];
-    strcpy(topicbuf, topic);
+    //char topicbuf[strlen(topic) + 1];
+    //strcpy(topicbuf, topic);
 
-    char* topic_command = topicbuf + strlen(heishamonSettings.mqtt_topic_base) + 1; //strip base plus seperator from topic
+    char* topic_command = topic + strlen(heishamonSettings.mqtt_topic_base) + 1; //strip base plus seperator from topic
     if (strcmp(topic_command, mqtt_send_raw_value_topic) == 0)
     { // send a raw hex string
       byte *rawcommand;
