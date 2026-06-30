@@ -954,10 +954,10 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
     char* topiccopy = (char*) malloc(strlen(topic) + 1);
     if (topiccopy) {
       memcpy(topiccopy, topic, strlen(topic) + 1);
+	  topic = topiccopy;	
     }
 	  
-	  
-	char* topic_command = topiccopy + strlen(heishamonSettings.mqtt_topic_base) + 1; //strip base plus seperator from topic
+	char* topic_command = topic + strlen(heishamonSettings.mqtt_topic_base) + 1; //strip base plus seperator from topic
     if (strcmp(topic_command, mqtt_send_raw_value_topic) == 0)
     { // send a raw hex string
       byte *rawcommand;
@@ -998,7 +998,8 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
     } else if (strncmp(topic_command, mqtt_topic_gpio, strlen(mqtt_topic_gpio)) == 0)  {
       char* topic_gpiocommand = topic_command + strlen(mqtt_topic_gpio) + 1; //strip the gpio subtopic from the topic
       mqttGPIOCallback(topic_gpiocommand, msg);
-    }    
+    } 
+	free(topiccopy);  
     mqttcallbackinprogress = false;
   }
 }
