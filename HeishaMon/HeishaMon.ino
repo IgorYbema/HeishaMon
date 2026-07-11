@@ -1114,7 +1114,7 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
               } else {
                 client->route = 150;
               }
-            } else {
+            } else { 
               loggingSerial.println(PSTR("New firmware update client, while previous isn't finished yet! Assume broken connection, abort!"));
               Update.end();
               return -1;
@@ -1380,7 +1380,7 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
               if (Update.isRunning()) {
                 if (Update.end(true)) {
                   log_message((char*)"Firmware update success");
-                  timerqueue_insert(2, 0, -2); // Start reboot sequence
+                  //timerqueue_insert(2, 0, -2); // Start reboot sequence
                   return showFirmwareSuccess(client);
                 } else {
                   Update.printError(loggingSerial);
