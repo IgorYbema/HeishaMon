@@ -1009,6 +1009,7 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
             uint16_t pos = (ptr-client->buffer)+strlen("content-disposition:");
             while(client->buffer[pos++] == ' ');
             pos--;
+            loggingSerial.printf(PSTR("[mp-dbg] case1 content-disposition: pos=%u readlen_before=%u\n"), (unsigned)pos, (unsigned)client->readlen);
             memmove(&client->buffer[0], &client->buffer[pos], client->ptr-(pos));
             client->ptr = client->ptr-(pos);
             client->buffer[client->ptr] = 0;
@@ -1025,6 +1026,7 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
             uint16_t pos = (ptr-client->buffer+1);
             while(client->buffer[pos++] == ' ');
             pos--;
+            loggingSerial.printf(PSTR("[mp-dbg] case2 end-of-disposition: pos=%u readlen_before=%u\n"), (unsigned)pos, (unsigned)client->readlen);
             memmove(&client->buffer[0], &client->buffer[pos], client->ptr-(pos));
             client->ptr -= pos;
             client->buffer[client->ptr] = 0;
@@ -1039,6 +1041,7 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
           unsigned char *ptr = strncasestr(client->buffer, "name=\"", client->ptr);
           if(ptr != NULL) {
             uint16_t pos = (ptr-client->buffer)+strlen("name=\"");
+            loggingSerial.printf(PSTR("[mp-dbg] case3 name=: pos=%u readlen_before=%u\n"), (unsigned)pos, (unsigned)client->readlen);
             memmove(&client->buffer[0], &client->buffer[pos], client->ptr-(pos));
             client->ptr = client->ptr-(pos);
             client->readlen += pos;
@@ -1059,6 +1062,8 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
                 client->buffer[pos++] = '=';
                 uint16_t pos1 = (ptr1-client->buffer);
                 uint16_t newlen = client->ptr-((pos1+4)-pos);
+                loggingSerial.printf(PSTR("[mp-dbg] case4 double-CRLF-shortcut: pos(post-inc)=%u pos1(dblCRLF)=%u ptr_before=%u newlen=%u readlen_before=%u readlen_delta=%u\n"),
+                  (unsigned)pos, (unsigned)pos1, (unsigned)client->ptr, (unsigned)newlen, (unsigned)client->readlen, (unsigned)(pos1+4));
                 memmove(&client->buffer[pos], &client->buffer[pos1+4], newlen);
                 client->ptr = newlen;
                 client->readlen += (pos1+4);
@@ -1074,6 +1079,8 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
                         client->buffer[pos++] = '=';
                         uint16_t pos1 = (ptr1-client->buffer);
                         uint16_t newlen = client->ptr-((pos1+2)-pos);
+                        loggingSerial.printf(PSTR("[mp-dbg] case4 single-CRLF: pos(post-inc)=%u pos1(crlf)=%u ptr_before=%u newlen=%u readlen_before=%u readlen_delta=%u\n"),
+                          (unsigned)pos, (unsigned)pos1, (unsigned)client->ptr, (unsigned)newlen, (unsigned)client->readlen, (unsigned)(pos1+2));
                         memmove(&client->buffer[pos], &client->buffer[pos1+2], newlen);
                         client->ptr = newlen;
                        client->readlen += (pos1+2);
@@ -1098,6 +1105,8 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
               if(ptr1 != NULL) {
                 uint16_t pos1 = (ptr1-client->buffer)+4;
                 uint16_t newlen = client->ptr-(pos1-pos);
+                loggingSerial.printf(PSTR("[mp-dbg] case5 content-type: pos=%u pos1(dblCRLF+4)=%u ptr_before=%u newlen=%u readlen_before=%u readlen_delta=%u\n"),
+                  (unsigned)pos, (unsigned)pos1, (unsigned)client->ptr, (unsigned)newlen, (unsigned)client->readlen, (unsigned)(pos1-pos));
                 memmove(&client->buffer[pos], &client->buffer[pos1], newlen);
                 client->ptr = newlen;
                 client->readlen += (pos1-pos);
@@ -1137,6 +1146,8 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
                   if(ptr2 != NULL) {
                     uint16_t pos1 = (ptr2-client->buffer)+4;
 
+                    loggingSerial.printf(PSTR("[mp-dbg] case6-alt short-name: pos(post-inc)=%u pos1(dblCRLF+4)=%u ptr_before=%u readlen_before=%u readlen_delta=%u\n"),
+                      (unsigned)pos, (unsigned)pos1, (unsigned)client->ptr, (unsigned)client->readlen, (unsigned)pos1);
                     memmove(&client->buffer[pos], &client->buffer[pos1], client->ptr-pos1);
                     client->ptr -= (pos1-pos);
                     client->readlen += pos1;
