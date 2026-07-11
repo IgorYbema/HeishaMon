@@ -123,6 +123,10 @@ typedef struct webserver_t {
   uint16_t ptr;
   uint32_t totallen;
   uint32_t readlen;
+  uint32_t mp_fed;    /* total bytes ever copied into buffer during a multipart
+                          body parse; readlen is derived as mp_fed - ptr so it
+                          can never drift out of sync with what's actually
+                          buffered, instead of being manually tracked per-state */
   uint16_t content;
   uint8_t route;
 #if WEBSERVER_MAX_SENDLIST == 0

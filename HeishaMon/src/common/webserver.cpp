@@ -57,11 +57,6 @@
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 
-static unsigned long g_ending_bytes_total = 0;
-static unsigned long g_total_bytes_fed = 0;
-static unsigned long g_ending_nonzero_count = 0;
-static unsigned long g_case8_split_count = 0;
-
 #ifndef ERR_OK
   #define ERR_OK 0
 #endif
@@ -777,12 +772,6 @@ int8_t http_parse_request(struct webserver_t *client, uint8_t **buf, uint16_t *l
                   memmove(&tmp[0], &tmp[pos], args.len-pos);
                   tmp[args.len-pos] = 0;
                   loggingSerial.printf(PSTR("[mp-dbg] boundary extracted: len=%u value=\"%s\"\n"), (unsigned)strlen(tmp), tmp);
-                  g_ending_bytes_total = 0;
-                  g_ending_nonzero_count = 0;
-                  g_case8_split_count = 0;
-                  // NOTE: g_total_bytes_fed is (re)initialized later, at the
-                  // client->readlen=0 reset (end of headers), not here -
-                  // more headers may still follow this one.
                   if((client->data.boundary = strdup(tmp)) == NULL) {
 #if defined(ESP8266) || defined(ESP32)
                     loggingSerial.printf("Out of memory %s:#%d\n", __FUNCTION__, __LINE__);
@@ -829,11 +818,12 @@ int8_t http_parse_request(struct webserver_t *client, uint8_t **buf, uint16_t *l
         memmove(&client->buffer[0], &client->buffer[2], client->ptr-2);
         client->ptr -= 2;
         client->readlen = 0;
-        // headers fully consumed here; whatever's left in the buffer (client->ptr)
-        // is body bytes already fed in but not yet seen by http_parse_multipart_body's
-        // own entry logging, so seed the running total with it for an apples-to-apples check
-        g_total_bytes_fed = client->ptr;
-        loggingSerial.printf(PSTR("[mp-dbg] end of headers: leftover_ptr=%u (seeding total_bytes_fed)\n"), (unsigned)client->ptr);
+        /* Seed with whatever's already sitting in the buffer: this same
+         * network chunk may have contained the start of the body right
+         * after the header terminator, and those bytes are already in
+         * ptr but haven't been through http_parse_multipart_body's own
+         * entry accounting yet. */
+        client->mp_fed = client->ptr;
         if(client->ptr == 0 && *len > 0) {
           client->substep = 5;
           continue;
@@ -896,88 +886,51 @@ char *strnstr(const char *haystack, const char *needle, size_t len) {
   return NULL;
 }
 
-static void mp_hexdump(const char *label, unsigned char *buf, uint16_t len, uint16_t maxlen) {
-  uint16_t n = MIN(len, maxlen);
-  loggingSerial.print(F("[mp-hex] "));
-  loggingSerial.print(label);
-  loggingSerial.printf(PSTR(" len=%u dump(first %u)="), (unsigned)len, (unsigned)n);
-  for(uint16_t i=0;i<n;i++) {
-    loggingSerial.printf(PSTR("%02x"), buf[i]);
-  }
-  loggingSerial.print(F(" ascii=\""));
-  for(uint16_t i=0;i<n;i++) {
-    char c = (char)buf[i];
-    loggingSerial.print((c >= 32 && c < 127) ? c : '.');
-  }
-  loggingSerial.println(F("\""));
-}
-
 int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, uint16_t len) {
-  // invariant check reflects state as settled at the end of the PREVIOUS call, before this chunk is absorbed
-  loggingSerial.printf(PSTR("[mp-dbg] entry: raw_chunk_len=%u ptr_before=%u substep=%u readlen=%u total_fed_so_far=%lu accounted(readlen+ptr)=%u invariant_diff=%ld\n"),
-    (unsigned)len, (unsigned)client->ptr, client->substep, (unsigned)client->readlen, g_total_bytes_fed,
-    (unsigned)(client->readlen + client->ptr), (long)g_total_bytes_fed - (long)(client->readlen + client->ptr));
-  g_total_bytes_fed += len;
   uint16_t hasread = MIN(WEBSERVER_BUFFER_SIZE-client->ptr, len);
   uint16_t rpos = 0, loop = 1;
+
   while((rpos < len) || ((loop == 1) && (client->ptr > 0))) {
     hasread = MIN(WEBSERVER_BUFFER_SIZE-client->ptr, len-rpos);
     memcpy(&client->buffer[client->ptr], &buf[rpos], hasread);
     client->ptr += hasread;
+    client->mp_fed += hasread;
     rpos += hasread;
     loop = 1;
-	
+
     while(loop) {
       switch(client->substep) {
-        // Boundary
+        /*
+         * Boundary: look for the multipart boundary token anywhere in the
+         * buffer. Once found, the 1-4 bytes immediately following it tell us
+         * whether this is a boundary preceding another field ("\r\n") or the
+         * terminating boundary ("--\r\n").
+         */
         case 0: {
-          unsigned char *ptr = strnstr(client->buffer, client->data.boundary, client->ptr);
-          unsigned char *ptr1 = (unsigned char *)memchr(client->buffer, '=', client->ptr);
-          uint16_t pos1 = 0;
-          if(ptr1 != NULL) {
-            pos1 = (ptr1-client->buffer)+1;
-          }
-          if(ptr != NULL) {
-            uint16_t pos = (ptr-client->buffer)+strlen(client->data.boundary);
-            uint16_t pos1_raw = pos1;
+          unsigned char *bptr = strnstr(client->buffer, client->data.boundary, client->ptr);
+          if(bptr != NULL) {
+            uint16_t pos = (bptr-client->buffer)+strlen(client->data.boundary);
 
-            if(pos1 > pos) {
-              /*
-               * Only compensate for the key at the
-               * beginning of the buffer when at least
-               * one key has been encountered. This is
-               * the case when the boundary is placed
-               * after the key.
-               */
-              pos1 = 0;
-            }
-            if(pos+1 <= client->ptr) {
+            if(pos+3 < client->ptr) {
               if(client->buffer[pos] == '\r' && client->buffer[pos+1] == '\n') {
-                loggingSerial.printf(PSTR("[mp-dbg] case0 mid-boundary: ptr=%u pos=%u pos1_raw=%u pos1_used=%u readlen_before=%u readlen_delta=%u\n"),
-                  (unsigned)client->ptr, (unsigned)pos, (unsigned)pos1_raw, (unsigned)pos1, (unsigned)client->readlen, (unsigned)(pos+1));
-                mp_hexdump("case0 mid-boundary buffer[0..ptr]", client->buffer, client->ptr, 96);
-                memmove(&client->buffer[0], &client->buffer[pos+1], client->ptr-(pos+1));
-                client->ptr = client->ptr-(pos+1);
+                /* Mid-body boundary: discard the boundary token and its CRLF,
+                 * carry on to parse the next field's headers. */
+                memmove(&client->buffer[0], &client->buffer[pos+2], client->ptr-(pos+2));
+                client->ptr -= (pos+2);
                 client->buffer[client->ptr] = 0;
-                // NOTE: no longer subtracting pos1 here - case4/case6-alt no
-                // longer credit the retained marker to readlen (fixed in
-                // 519a734), so there is nothing left to compensate for.
-                client->readlen += (pos+1);
                 client->substep = 1;
-              }
-            }
-            if(pos+3 <= client->ptr) {
-              if(client->buffer[pos] == '-' && client->buffer[pos+1] == '-' &&
-                client->buffer[pos+2] == '\r' && client->buffer[pos+3] == '\n') {
-                loggingSerial.printf(PSTR("[mp-dbg] case0 FINAL-boundary: ptr=%u pos=%u pos1_raw=%u pos1_used=%u readlen_before=%u readlen_delta=%u totallen=%u boundary=\"%s\"\n"),
-                  (unsigned)client->ptr, (unsigned)pos, (unsigned)pos1_raw, (unsigned)pos1, (unsigned)client->readlen, (unsigned)(pos+4), (unsigned)client->totallen, client->data.boundary);
-                mp_hexdump("case0 FINAL-boundary buffer[0..ptr]", client->buffer, client->ptr, 96);
-                loggingSerial.printf(PSTR("[mp-dbg] case8 split summary: total_splits=%lu nonzero_ending_count=%lu cumulative_held_bytes=%lu\n"),
-                  g_case8_split_count, g_ending_nonzero_count, g_ending_bytes_total);
-                loggingSerial.printf(PSTR("[mp-dbg] pre-final invariant check: total_fed_so_far=%lu accounted(readlen+ptr)=%u invariant_diff=%ld (ptr here still includes the unconsumed boundary text)\n"),
-                  g_total_bytes_fed, (unsigned)(client->readlen + client->ptr), (long)g_total_bytes_fed - (long)(client->readlen + client->ptr));
-                // NOTE: no longer subtracting pos1 here - see case0 mid-boundary comment above
-                client->readlen += (pos+4);
+              } else if(client->buffer[pos] == '-' && client->buffer[pos+1] == '-' &&
+                        client->buffer[pos+2] == '\r' && client->buffer[pos+3] == '\n') {
+                /* Final boundary: everything through pos+4 has been consumed.
+                 * Whatever remains past it (should be nothing for a
+                 * well-formed request, but handle it correctly regardless)
+                 * shifts down to the front of the buffer. */
+                uint16_t remaining = client->ptr-(pos+4);
+                if(remaining > 0) {
+                  memmove(&client->buffer[0], &client->buffer[pos+4], remaining);
+                }
+                client->ptr = remaining;
+                client->readlen = client->mp_fed - client->ptr;
                 if(client->readlen == client->totallen) {
                   if(client->data.boundary != NULL) {
                     free(client->data.boundary);
@@ -985,20 +938,58 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
                   }
                   return 0;
                 } else {
-                  // Error, content length does not match end boundary
-                  loggingSerial.printf(PSTR("[mp-dbg] case0 FINAL-boundary MISMATCH: readlen=%u totallen=%u diff=%d\n"),
+                  /* Content length does not match what the terminating
+                   * boundary implies - the declared length disagrees with
+                   * what was actually received. */
+                  loggingSerial.printf(PSTR("[mp-dbg] multipart length mismatch: readlen=%u totallen=%u diff=%d\n"),
                     (unsigned)client->readlen, (unsigned)client->totallen, (int)((long)client->readlen - (long)client->totallen));
                   return -1;
                 }
+              } else {
+                /*
+                 * The boundary token text matched, but what follows isn't a
+                 * valid delimiter (neither "\r\n" nor "--\r\n"). This can only
+                 * be a coincidental match inside the raw field data - treat it
+                 * exactly like the "not found" path below.
+                 */
+                if(client->ptr < WEBSERVER_BUFFER_SIZE) {
+                  loop = 0;
+                } else {
+                  client->substep = 8;
+                }
+              }
+            } else if(client->ptr < WEBSERVER_BUFFER_SIZE) {
+              /* Found the token, but not enough trailing bytes buffered yet
+               * to know which kind of boundary this is - wait for more. */
+              loop = 0;
+            } else {
+              /*
+               * Buffer is completely full and we still can't tell what kind
+               * of boundary this is. Rather than deadlock (no room left for
+               * the outer loop to read more), shift the match down to the
+               * front of the buffer, discarding whatever preceded it - that
+               * content is definitely not part of the boundary itself, so
+               * it's safe to drop once we've credited it via mp_fed/ptr
+               * accounting (readlen is derived, so nothing further needed).
+               */
+              uint16_t shift = (bptr-client->buffer);
+              if(shift > 0) {
+                memmove(&client->buffer[0], bptr, client->ptr-shift);
+                client->ptr -= shift;
+              } else {
+                /* The boundary token plus its 4-byte delimiter doesn't fit
+                 * in the whole buffer even at position 0 - the buffer is too
+                 * small for this boundary string. Not recoverable. */
+                return -1;
               }
             }
           } else if(client->ptr < WEBSERVER_BUFFER_SIZE) {
             loop = 0;
           } else {
             /*
-             * We encountered the boundary delimiter, but
-             * it wasn't the one from this request, but it
-             * was part of the POST body
+             * The boundary delimiter wasn't found anywhere in a completely
+             * full buffer - it was part of the field's raw value data, not
+             * an actual boundary. Treat the whole buffer as value content.
              */
             client->substep = 8;
           }
@@ -1013,11 +1004,9 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
             uint16_t pos = (ptr-client->buffer)+strlen("content-disposition:");
             while(client->buffer[pos++] == ' ');
             pos--;
-            loggingSerial.printf(PSTR("[mp-dbg] case1 content-disposition: pos=%u readlen_before=%u\n"), (unsigned)pos, (unsigned)client->readlen);
             memmove(&client->buffer[0], &client->buffer[pos], client->ptr-(pos));
             client->ptr = client->ptr-(pos);
             client->buffer[client->ptr] = 0;
-            client->readlen += pos;
             client->substep = 2;
           } else {
             loop = 0;
@@ -1030,11 +1019,9 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
             uint16_t pos = (ptr-client->buffer+1);
             while(client->buffer[pos++] == ' ');
             pos--;
-            loggingSerial.printf(PSTR("[mp-dbg] case2 end-of-disposition: pos=%u readlen_before=%u\n"), (unsigned)pos, (unsigned)client->readlen);
             memmove(&client->buffer[0], &client->buffer[pos], client->ptr-(pos));
             client->ptr -= pos;
             client->buffer[client->ptr] = 0;
-            client->readlen += pos;
             client->substep = 3;
           } else {
             loop = 0;
@@ -1045,10 +1032,8 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
           unsigned char *ptr = strncasestr(client->buffer, "name=\"", client->ptr);
           if(ptr != NULL) {
             uint16_t pos = (ptr-client->buffer)+strlen("name=\"");
-            loggingSerial.printf(PSTR("[mp-dbg] case3 name=: pos=%u readlen_before=%u\n"), (unsigned)pos, (unsigned)client->readlen);
             memmove(&client->buffer[0], &client->buffer[pos], client->ptr-(pos));
             client->ptr = client->ptr-(pos);
-            client->readlen += pos;
             client->substep = 6;
           } else {
             loop = 0;
@@ -1062,37 +1047,32 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
             // First try to find \r\n\r\n (end of all headers)
             unsigned char *ptr1 = strnstr(&client->buffer[pos], "\r\n\r\n", client->ptr-pos);
             if(ptr1 != NULL) {
-                // Double CRLF found - skip directly to data
-                client->buffer[pos++] = '=';
-                uint16_t pos1 = (ptr1-client->buffer);
-                uint16_t newlen = client->ptr-((pos1+4)-pos);
-                loggingSerial.printf(PSTR("[mp-dbg] case4 double-CRLF-shortcut: pos(post-inc)=%u pos1(dblCRLF)=%u ptr_before=%u newlen=%u readlen_before=%u readlen_delta=%u\n"),
-                  (unsigned)pos, (unsigned)pos1, (unsigned)client->ptr, (unsigned)newlen, (unsigned)client->readlen, (unsigned)((pos1+4)-pos));
-                memmove(&client->buffer[pos], &client->buffer[pos1+4], client->ptr-(pos1+4));
-                client->ptr = newlen;
-                client->readlen += ((pos1+4)-pos);
-                client->substep = 7;  // skip case 5 entirely, go straight to data
+              // Double CRLF found - skip directly to data
+              client->buffer[pos++] = '=';
+              uint16_t pos1 = (ptr1-client->buffer);
+              uint16_t newlen = client->ptr-((pos1+4)-pos);
+              memmove(&client->buffer[pos], &client->buffer[pos1+4], client->ptr-(pos1+4));
+              client->ptr = newlen;
+              // Skip case 5 entirely, go straight to data
+              client->substep = 7;
             } else {
-                // Single \r\n - if more headers follow, go to case 5
-                ptr1 = strncasestr(&client->buffer[pos], "\r\n", client->ptr-pos);
-                if(ptr1 != NULL) {
-                    if (((ptr1-client->buffer) + 4) >= client->ptr) {
-                        //CRLF on end of buffer, wait for two more to make sure we are not at end of header
-					    loop = 0;
-                    } else {
-                        client->buffer[pos++] = '=';
-                        uint16_t pos1 = (ptr1-client->buffer);
-                        uint16_t newlen = client->ptr-((pos1+2)-pos);
-                        loggingSerial.printf(PSTR("[mp-dbg] case4 single-CRLF: pos(post-inc)=%u pos1(crlf)=%u ptr_before=%u newlen=%u readlen_before=%u readlen_delta=%u\n"),
-                          (unsigned)pos, (unsigned)pos1, (unsigned)client->ptr, (unsigned)newlen, (unsigned)client->readlen, (unsigned)((pos1+2)-pos));
-                        memmove(&client->buffer[pos], &client->buffer[pos1+2], client->ptr-(pos1+2));
-                        client->ptr = newlen;
-                       client->readlen += ((pos1+2)-pos);
-                        client->substep = 5;
-                    }
-                  } else {
-                      client->substep = 6;
+              // Single \r\n - more headers follow, go to case 5
+              ptr1 = strncasestr(&client->buffer[pos], "\r\n", client->ptr-pos);
+              if(ptr1 != NULL) {
+                if(((ptr1-client->buffer) + 4) >= client->ptr) {
+                  // CRLF on end of buffer, wait for two more to make sure we are not at end of header
+                  loop = 0;
+                } else {
+                  client->buffer[pos++] = '=';
+                  uint16_t pos1 = (ptr1-client->buffer);
+                  uint16_t newlen = client->ptr-((pos1+2)-pos);
+                  memmove(&client->buffer[pos], &client->buffer[pos1+2], client->ptr-(pos1+2));
+                  client->ptr = newlen;
+                  client->substep = 5;
                 }
+              } else {
+                client->substep = 6;
+              }
             }
           } else {
             loop = 0;
@@ -1109,11 +1089,8 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
               if(ptr1 != NULL) {
                 uint16_t pos1 = (ptr1-client->buffer)+4;
                 uint16_t newlen = client->ptr-(pos1-pos);
-                loggingSerial.printf(PSTR("[mp-dbg] case5 content-type: pos=%u pos1(dblCRLF+4)=%u ptr_before=%u newlen=%u readlen_before=%u readlen_delta=%u\n"),
-                  (unsigned)pos, (unsigned)pos1, (unsigned)client->ptr, (unsigned)newlen, (unsigned)client->readlen, (unsigned)(pos1-pos));
                 memmove(&client->buffer[pos], &client->buffer[pos1], client->ptr-pos1);
                 client->ptr = newlen;
-                client->readlen += (pos1-pos);
                 client->substep = 7;
               } else {
                 loop = 0;
@@ -1150,11 +1127,8 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
                   if(ptr2 != NULL) {
                     uint16_t pos1 = (ptr2-client->buffer)+4;
 
-                    loggingSerial.printf(PSTR("[mp-dbg] case6-alt short-name: pos(post-inc)=%u pos1(dblCRLF+4)=%u ptr_before=%u readlen_before=%u readlen_delta=%u\n"),
-                      (unsigned)pos, (unsigned)pos1, (unsigned)client->ptr, (unsigned)client->readlen, (unsigned)(pos1-pos));
                     memmove(&client->buffer[pos], &client->buffer[pos1], client->ptr-pos1);
                     client->ptr -= (pos1-pos);
-                    client->readlen += (pos1-pos);
                     client->substep = 7;
                   } else {
                     loop = 0;
@@ -1176,6 +1150,7 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
           unsigned char *ptr = strnstr(client->buffer, "\r\n--", client->ptr);
           if(ptr != NULL && client->substep != 8) {
             uint16_t pos = (ptr-client->buffer);
+
             ptr = (unsigned char *)memchr(client->buffer, '=', client->ptr);
             uint16_t vlen = 0;
 
@@ -1185,30 +1160,27 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
               // error
               return -1; /*LCOV_EXCL_LINE*/
             }
-			struct arguments_t args;
-			client->buffer[vlen] = 0;
 
-			args.name = &client->buffer[0];
-			args.value = &client->buffer[vlen+1];
-			args.len = pos-(vlen+1);
+            struct arguments_t args;
+            client->buffer[vlen] = 0;
 
-			loggingSerial.printf(PSTR("[mp-dbg] case7 real-boundary-found: ptr_before=%u vlen=%u pos=%u args.len=%u readlen_before=%u name=\"%.*s\"\n"),
-			  (unsigned)client->ptr, (unsigned)vlen, (unsigned)pos, (unsigned)args.len, (unsigned)client->readlen, (int)MIN(vlen, 32), (char *)args.name);
-			mp_hexdump("case7 tail (from pos-16)", pos >= 16 ? &client->buffer[pos-16] : client->buffer, (pos >= 16 ? client->ptr-(pos-16) : client->ptr), 48);
+            args.name = &client->buffer[0];
+            args.value = &client->buffer[vlen+1];
+            args.len = pos-(vlen+1);
 
-			if(client->callback != NULL) {
-				uint8_t ret = client->callback(client, &args);
-				if(ret == -1) {
-					return -1;
-				}
-			}
+            if(client->callback != NULL) {
+              uint8_t ret = client->callback(client, &args);
+              if(ret == -1) {
+                return -1;
+              }
+            }
 
-			client->buffer[vlen] = '=';
-			memmove(&client->buffer[vlen+1], &client->buffer[pos], client->ptr-pos);
-			client->readlen += (pos-(vlen+1));
-			client->ptr -= (pos-(vlen+1));
+            client->buffer[vlen] = '=';
+
+            memmove(&client->buffer[vlen+1], &client->buffer[pos], client->ptr-pos);
+            client->ptr -= (pos-(vlen+1));
             client->substep = 0;
-		  } else if(client->ptr == WEBSERVER_BUFFER_SIZE) {
+          } else if(client->ptr == WEBSERVER_BUFFER_SIZE) {
             uint8_t ending = 0;
             uint8_t dash = 0;
             /*
@@ -1228,13 +1200,6 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
               ending = 3;
               dash = 1;
             }
-            g_case8_split_count++;
-            if(ending != 0) {
-              g_ending_nonzero_count++;
-              g_ending_bytes_total += ending;
-              loggingSerial.printf(PSTR("[mp-dbg] case8 NONZERO ending=%u dash=%u split#=%lu readlen_before=%u cumulative_held_bytes=%lu cumulative_held_count=%lu\n"),
-                ending, dash, g_case8_split_count, (unsigned)client->readlen, g_ending_bytes_total, g_ending_nonzero_count);
-            }
             if(client->substep == 8) {
               client->substep = 7;
             }
@@ -1248,9 +1213,6 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
               args.name = &client->buffer[0];
               args.value = &client->buffer[pos+1];
               args.len = (client->ptr-ending)-(pos+1);
-
-              loggingSerial.printf(PSTR("[mp-dbg] case8 buffer-full split: ptr_before=%u pos=%u ending=%u args.len=%u readlen_before=%u name=\"%.*s\"\n"),
-                (unsigned)client->ptr, (unsigned)pos, (unsigned)ending, (unsigned)args.len, (unsigned)client->readlen, (int)MIN(pos, 32), (char *)args.name);
 
               if(client->callback != NULL) {
                 uint8_t ret = client->callback(client, &args);
@@ -1274,7 +1236,6 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
                   client->buffer[pos+3] = '-';
                 }
               }
-              client->readlen += ((client->ptr-(pos+1))-ending);
               client->ptr = pos+1+ending;
               loop = 0;
             } else {
@@ -1282,13 +1243,15 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
               return -1;
             }
           } else {
-			loop = 0;
-		  }
+            loop = 0;
+          }
         } break;
       }
+      client->readlen = client->mp_fed - client->ptr;
     }
   }
 
+  client->readlen = client->mp_fed - client->ptr;
   return 0;
 }
 
@@ -2348,6 +2311,7 @@ void webserver_reset_client(struct webserver_t *client) {
 #endif
 
   client->readlen = 0;
+  client->mp_fed = 0;
   client->reqtype = 0;
   client->method = 0;
   client->async = 0;
