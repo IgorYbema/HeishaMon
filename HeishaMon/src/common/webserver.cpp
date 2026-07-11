@@ -58,6 +58,7 @@
 #define MIN(a,b) (((a)<(b))?(a):(b))
 
 static unsigned long g_ending_bytes_total = 0;
+static unsigned long g_total_bytes_fed = 0;
 static unsigned long g_ending_nonzero_count = 0;
 static unsigned long g_case8_split_count = 0;
 
@@ -779,6 +780,7 @@ int8_t http_parse_request(struct webserver_t *client, uint8_t **buf, uint16_t *l
                   g_ending_bytes_total = 0;
                   g_ending_nonzero_count = 0;
                   g_case8_split_count = 0;
+                  g_total_bytes_fed = 0;
                   if((client->data.boundary = strdup(tmp)) == NULL) {
 #if defined(ESP8266) || defined(ESP32)
                     loggingSerial.printf("Out of memory %s:#%d\n", __FUNCTION__, __LINE__);
@@ -904,7 +906,11 @@ static void mp_hexdump(const char *label, unsigned char *buf, uint16_t len, uint
 }
 
 int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, uint16_t len) {
-  loggingSerial.printf(PSTR("[mp-dbg] entry: raw_chunk_len=%u ptr_before=%u substep=%u readlen=%u\n"), (unsigned)len, (unsigned)client->ptr, client->substep, (unsigned)client->readlen);
+  // invariant check reflects state as settled at the end of the PREVIOUS call, before this chunk is absorbed
+  loggingSerial.printf(PSTR("[mp-dbg] entry: raw_chunk_len=%u ptr_before=%u substep=%u readlen=%u total_fed_so_far=%lu accounted(readlen+ptr)=%u invariant_diff=%ld\n"),
+    (unsigned)len, (unsigned)client->ptr, client->substep, (unsigned)client->readlen, g_total_bytes_fed,
+    (unsigned)(client->readlen + client->ptr), (long)g_total_bytes_fed - (long)(client->readlen + client->ptr));
+  g_total_bytes_fed += len;
   uint16_t hasread = MIN(WEBSERVER_BUFFER_SIZE-client->ptr, len);
   uint16_t rpos = 0, loop = 1;
   while((rpos < len) || ((loop == 1) && (client->ptr > 0))) {
@@ -958,6 +964,8 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
                 mp_hexdump("case0 FINAL-boundary buffer[0..ptr]", client->buffer, client->ptr, 96);
                 loggingSerial.printf(PSTR("[mp-dbg] case8 split summary: total_splits=%lu nonzero_ending_count=%lu cumulative_held_bytes=%lu\n"),
                   g_case8_split_count, g_ending_nonzero_count, g_ending_bytes_total);
+                loggingSerial.printf(PSTR("[mp-dbg] pre-final invariant check: total_fed_so_far=%lu accounted(readlen+ptr)=%u invariant_diff=%ld (ptr here still includes the unconsumed boundary text)\n"),
+                  g_total_bytes_fed, (unsigned)(client->readlen + client->ptr), (long)g_total_bytes_fed - (long)(client->readlen + client->ptr));
                 client->readlen += ((pos+4)-(pos1));
                 if(client->readlen == client->totallen) {
                   if(client->data.boundary != NULL) {
