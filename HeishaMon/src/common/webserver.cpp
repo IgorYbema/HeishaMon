@@ -770,6 +770,7 @@ int8_t http_parse_request(struct webserver_t *client, uint8_t **buf, uint16_t *l
                   uint8_t pos = (ptr-tmp)+strlen("boundary=");
                   memmove(&tmp[0], &tmp[pos], args.len-pos);
                   tmp[args.len-pos] = 0;
+                  loggingSerial.printf(PSTR("[mp-dbg] boundary extracted: len=%u value=\"%s\"\n"), (unsigned)strlen(tmp), tmp);
                   if((client->data.boundary = strdup(tmp)) == NULL) {
 #if defined(ESP8266) || defined(ESP32)
                     loggingSerial.printf("Out of memory %s:#%d\n", __FUNCTION__, __LINE__);
@@ -878,7 +879,24 @@ char *strnstr(const char *haystack, const char *needle, size_t len) {
   return NULL;
 }
 
+static void mp_hexdump(const char *label, unsigned char *buf, uint16_t len, uint16_t maxlen) {
+  uint16_t n = MIN(len, maxlen);
+  loggingSerial.print(F("[mp-hex] "));
+  loggingSerial.print(label);
+  loggingSerial.printf(PSTR(" len=%u dump(first %u)="), (unsigned)len, (unsigned)n);
+  for(uint16_t i=0;i<n;i++) {
+    loggingSerial.printf(PSTR("%02x"), buf[i]);
+  }
+  loggingSerial.print(F(" ascii=\""));
+  for(uint16_t i=0;i<n;i++) {
+    char c = (char)buf[i];
+    loggingSerial.print((c >= 32 && c < 127) ? c : '.');
+  }
+  loggingSerial.println(F("\""));
+}
+
 int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, uint16_t len) {
+  loggingSerial.printf(PSTR("[mp-dbg] entry: raw_chunk_len=%u ptr_before=%u substep=%u readlen=%u\n"), (unsigned)len, (unsigned)client->ptr, client->substep, (unsigned)client->readlen);
   uint16_t hasread = MIN(WEBSERVER_BUFFER_SIZE-client->ptr, len);
   uint16_t rpos = 0, loop = 1;
   while((rpos < len) || ((loop == 1) && (client->ptr > 0))) {
@@ -916,6 +934,7 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
               if(client->buffer[pos] == '\r' && client->buffer[pos+1] == '\n') {
                 loggingSerial.printf(PSTR("[mp-dbg] case0 mid-boundary: ptr=%u pos=%u pos1_raw=%u pos1_used=%u readlen_before=%u readlen_delta=%u\n"),
                   (unsigned)client->ptr, (unsigned)pos, (unsigned)pos1_raw, (unsigned)pos1, (unsigned)client->readlen, (unsigned)((pos+1)-pos1));
+                mp_hexdump("case0 mid-boundary buffer[0..ptr]", client->buffer, client->ptr, 96);
                 memmove(&client->buffer[0], &client->buffer[pos+1], client->ptr-(pos+1));
                 client->ptr = client->ptr-(pos+1);
                 client->buffer[client->ptr] = 0;
@@ -926,8 +945,9 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
             if(pos+3 <= client->ptr) {
               if(client->buffer[pos] == '-' && client->buffer[pos+1] == '-' &&
                 client->buffer[pos+2] == '\r' && client->buffer[pos+3] == '\n') {
-                loggingSerial.printf(PSTR("[mp-dbg] case0 FINAL-boundary: ptr=%u pos=%u pos1_raw=%u pos1_used=%u readlen_before=%u readlen_delta=%u totallen=%u\n"),
-                  (unsigned)client->ptr, (unsigned)pos, (unsigned)pos1_raw, (unsigned)pos1, (unsigned)client->readlen, (unsigned)((pos+4)-pos1), (unsigned)client->totallen);
+                loggingSerial.printf(PSTR("[mp-dbg] case0 FINAL-boundary: ptr=%u pos=%u pos1_raw=%u pos1_used=%u readlen_before=%u readlen_delta=%u totallen=%u boundary=\"%s\"\n"),
+                  (unsigned)client->ptr, (unsigned)pos, (unsigned)pos1_raw, (unsigned)pos1, (unsigned)client->readlen, (unsigned)((pos+4)-pos1), (unsigned)client->totallen, client->data.boundary);
+                mp_hexdump("case0 FINAL-boundary buffer[0..ptr]", client->buffer, client->ptr, 96);
                 client->readlen += ((pos+4)-(pos1));
                 if(client->readlen == client->totallen) {
                   if(client->data.boundary != NULL) {
@@ -1134,6 +1154,7 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
 
 			loggingSerial.printf(PSTR("[mp-dbg] case7 real-boundary-found: ptr_before=%u vlen=%u pos=%u args.len=%u readlen_before=%u name=\"%.*s\"\n"),
 			  (unsigned)client->ptr, (unsigned)vlen, (unsigned)pos, (unsigned)args.len, (unsigned)client->readlen, (int)MIN(vlen, 32), (char *)args.name);
+			mp_hexdump("case7 tail (from pos-16)", pos >= 16 ? &client->buffer[pos-16] : client->buffer, (pos >= 16 ? client->ptr-(pos-16) : client->ptr), 48);
 
 			if(client->callback != NULL) {
 				uint8_t ret = client->callback(client, &args);
