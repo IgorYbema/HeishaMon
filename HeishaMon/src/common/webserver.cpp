@@ -56,6 +56,11 @@
 #endif
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
+
+static unsigned long g_ending_bytes_total = 0;
+static unsigned long g_ending_nonzero_count = 0;
+static unsigned long g_case8_split_count = 0;
+
 #ifndef ERR_OK
   #define ERR_OK 0
 #endif
@@ -771,6 +776,9 @@ int8_t http_parse_request(struct webserver_t *client, uint8_t **buf, uint16_t *l
                   memmove(&tmp[0], &tmp[pos], args.len-pos);
                   tmp[args.len-pos] = 0;
                   loggingSerial.printf(PSTR("[mp-dbg] boundary extracted: len=%u value=\"%s\"\n"), (unsigned)strlen(tmp), tmp);
+                  g_ending_bytes_total = 0;
+                  g_ending_nonzero_count = 0;
+                  g_case8_split_count = 0;
                   if((client->data.boundary = strdup(tmp)) == NULL) {
 #if defined(ESP8266) || defined(ESP32)
                     loggingSerial.printf("Out of memory %s:#%d\n", __FUNCTION__, __LINE__);
@@ -948,6 +956,8 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
                 loggingSerial.printf(PSTR("[mp-dbg] case0 FINAL-boundary: ptr=%u pos=%u pos1_raw=%u pos1_used=%u readlen_before=%u readlen_delta=%u totallen=%u boundary=\"%s\"\n"),
                   (unsigned)client->ptr, (unsigned)pos, (unsigned)pos1_raw, (unsigned)pos1, (unsigned)client->readlen, (unsigned)((pos+4)-pos1), (unsigned)client->totallen, client->data.boundary);
                 mp_hexdump("case0 FINAL-boundary buffer[0..ptr]", client->buffer, client->ptr, 96);
+                loggingSerial.printf(PSTR("[mp-dbg] case8 split summary: total_splits=%lu nonzero_ending_count=%lu cumulative_held_bytes=%lu\n"),
+                  g_case8_split_count, g_ending_nonzero_count, g_ending_bytes_total);
                 client->readlen += ((pos+4)-(pos1));
                 if(client->readlen == client->totallen) {
                   if(client->data.boundary != NULL) {
@@ -1187,6 +1197,13 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
             if(strncmp((char *)&client->buffer[client->ptr-3], "\r\n-", 3) == 0) {
               ending = 3;
               dash = 1;
+            }
+            g_case8_split_count++;
+            if(ending != 0) {
+              g_ending_nonzero_count++;
+              g_ending_bytes_total += ending;
+              loggingSerial.printf(PSTR("[mp-dbg] case8 NONZERO ending=%u dash=%u split#=%lu readlen_before=%u cumulative_held_bytes=%lu cumulative_held_count=%lu\n"),
+                ending, dash, g_case8_split_count, (unsigned)client->readlen, g_ending_bytes_total, g_ending_nonzero_count);
             }
             if(client->substep == 8) {
               client->substep = 7;
