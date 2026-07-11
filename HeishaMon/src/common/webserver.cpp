@@ -80,12 +80,39 @@ static uint8_t *rbuffer = NULL;
   safe write is necessary for esp8266 so it doesn't block
   on esp32 wifi is multithreaded, not necessary but also not implemented on availableforWrite so skip it there
 */
+#if defined(ESP8266) || defined(ESP32)
+static void webserver_close_debug(struct webserver_t *client, const char *reason) {
+  loggingSerial.print(F("[close-dbg] "));
+  loggingSerial.print(reason);
+  loggingSerial.print(F(" ip="));
+  if(client->async == 1 && client->pcb != NULL) {
+    loggingSerial.print(ipaddr_ntoa(&client->pcb->remote_ip));
+    loggingSerial.print(F(":"));
+    loggingSerial.print(client->pcb->remote_port);
+  } else if(client->client != NULL) {
+    loggingSerial.print(client->client->remoteIP().toString().c_str());
+    loggingSerial.print(F(":"));
+    loggingSerial.print(client->client->remotePort());
+  } else {
+    loggingSerial.print(F("unknown"));
+  }
+  loggingSerial.printf(PSTR(" route=%d step=%d substep=%d readlen=%u totallen=%u ptr=%u heap=%u\n"),
+    client->route, client->step, client->substep, (unsigned)client->readlen, (unsigned)client->totallen, client->ptr, (unsigned)ESP.getFreeHeap());
+}
+#else
+static void webserver_close_debug(struct webserver_t *client, const char *reason) {
+  (void)client;
+  (void)reason;
+}
+#endif
+
 static int16_t safe_write(struct webserver_t *client, const uint8_t *buf, uint16_t len) {
 #if defined(ESP8266)
   uint32_t start = millis();
   while(client->client->availableForWrite() == 0) {
     if((unsigned long)(millis() - start) > 1000) {
       // client is too slow, give up
+      webserver_close_debug(client, "safe_write: client too slow to accept write, giving up");
       client->step = WEBSERVER_CLIENT_CLOSE;
       return -1;
     }
@@ -101,6 +128,7 @@ static int16_t safe_write_P(struct webserver_t *client, PGM_P buf, uint16_t len)
   while(client->client->availableForWrite() == 0) {
     if((unsigned long)(millis() - start) > 1000) {
       // client is too slow, give up
+      webserver_close_debug(client, "safe_write_P: client too slow to accept write, giving up");
       client->step = WEBSERVER_CLIENT_CLOSE;
       return -1;
     }
@@ -561,6 +589,7 @@ int8_t http_parse_request(struct webserver_t *client, uint8_t **buf, uint16_t *l
           client->step = WEBSERVER_CLIENT_REQUEST_METHOD;
           if(client->callback != NULL) {
             if(client->callback(client, (void *)"GET") == -1) {
+              webserver_close_debug(client, "http_parse_request: GET method callback returned -1");
               client->step = WEBSERVER_CLIENT_CLOSE;
               return -1;
             }
@@ -577,6 +606,7 @@ int8_t http_parse_request(struct webserver_t *client, uint8_t **buf, uint16_t *l
         client->step = WEBSERVER_CLIENT_REQUEST_METHOD;
         if(client->callback != NULL) {
           if(client->callback(client, (void *)"POST") == -1) {
+            webserver_close_debug(client, "http_parse_request: POST method callback returned -1");
             client->step = WEBSERVER_CLIENT_CLOSE;
             return -1;
           }
@@ -608,6 +638,7 @@ int8_t http_parse_request(struct webserver_t *client, uint8_t **buf, uint16_t *l
           client->step = WEBSERVER_CLIENT_REQUEST_URI;
           if(client->callback != NULL) {
             if(client->callback(client, client->buffer) == -1) {
+              webserver_close_debug(client, "http_parse_request: request URI callback returned -1 (variant A)");
               client->step = WEBSERVER_CLIENT_CLOSE;
               return -1;
             }
@@ -622,6 +653,7 @@ int8_t http_parse_request(struct webserver_t *client, uint8_t **buf, uint16_t *l
         client->step = WEBSERVER_CLIENT_REQUEST_URI;
         if(client->callback != NULL) {
           if(client->callback(client, client->buffer) == -1) {
+            webserver_close_debug(client, "http_parse_request: request URI callback returned -1 (variant B)");
             client->step = WEBSERVER_CLIENT_CLOSE;
             return -1;
           }
@@ -751,6 +783,7 @@ int8_t http_parse_request(struct webserver_t *client, uint8_t **buf, uint16_t *l
             client->step = WEBSERVER_CLIENT_HEADER;
             if(client->callback != NULL) {
               if(client->callback(client, &args) == -1) {
+                webserver_close_debug(client, "http_parse_request: header callback returned -1");
                 client->step = WEBSERVER_CLIENT_CLOSE;
                 return -1;
               }
@@ -1622,6 +1655,7 @@ static int webserver_process_send(struct webserver_t *client) {
     } else {
       client->step = WEBSERVER_CLIENT_WRITE;
       if(client->callback(client, NULL) == -1) {
+        webserver_close_debug(client, "webserver_send_content: WRITE callback returned -1");
         client->step = WEBSERVER_CLIENT_CLOSE;
       } else {
         client->step = WEBSERVER_CLIENT_SENDING;
@@ -1661,6 +1695,7 @@ static int webserver_process_send(struct webserver_t *client) {
           }
           i += 4;
         }
+        webserver_close_debug(client, "webserver_send_content: response fully sent, closing normally");
         client->step = WEBSERVER_CLIENT_CLOSE;
         client->userdata = NULL;
         client->ptr = 0;
@@ -1839,6 +1874,7 @@ done:
 
 /* LCOV_EXCL_START*/
 static void webserver_client_close(struct webserver_t *client) {
+  webserver_close_debug(client, "webserver_client_close: entering close");
   if(client->callback != NULL) {
     client->callback(client, NULL);
   }
@@ -1875,6 +1911,7 @@ err_t webserver_sent(void *arg, tcp_pcb *pcb, uint16_t len) {
     if(clients[i].data.pcb == pcb) {
       if(clients[i].data.step == WEBSERVER_CLIENT_WRITE) {
         if(clients[i].data.callback(&clients[i].data, NULL) == -1) {
+          webserver_close_debug(&clients[i].data, "webserver_sent: WRITE callback returned -1");
           clients[i].data.step = WEBSERVER_CLIENT_CLOSE;
         } else {
           clients[i].data.step = WEBSERVER_CLIENT_SENDING;
@@ -2045,6 +2082,7 @@ int websocket_read(struct webserver_t *client, unsigned char *buf, ssize_t buf_l
     } break;
     case WEBSOCKET_OPCODE_CONNECTION_CLOSE:
       websocket_send_header(client, WEBSOCKET_OPCODE_CONNECTION_CLOSE, 0);
+      webserver_close_debug(client, "websocket_read: peer sent CONNECTION_CLOSE opcode");
       client->step = WEBSERVER_CLIENT_CLOSE;
       return -1;
     break;
@@ -2052,11 +2090,13 @@ int websocket_read(struct webserver_t *client, unsigned char *buf, ssize_t buf_l
       if(client->callback != NULL) {
         client->step = WEBSERVER_CLIENT_WEBSOCKET_TEXT;
         if(client->callback(client, buf) == -1) {
+          webserver_close_debug(client, "websocket_read: TEXT callback returned -1");
           client->step = WEBSERVER_CLIENT_CLOSE;
           return -1;
         }
         client->step = WEBSERVER_CLIENT_WEBSOCKET;
       } else {
+        webserver_close_debug(client, "websocket_read: TEXT opcode but no callback registered");
         client->step = WEBSERVER_CLIENT_CLOSE;
         return -1;
       }
@@ -2082,11 +2122,13 @@ uint8_t webserver_sync_receive(struct webserver_t *client, uint8_t *rbuffer, uin
          if(client->reqtype == 0) {
           client->readlen = 0;
           if(http_parse_body(client, (char *)rbuffer, size) == -1) {
+            webserver_close_debug(client, "webserver_sync_receive: http_parse_body (first chunk) returned -1");
             client->step = WEBSERVER_CLIENT_CLOSE;
           }
         } else if(client->reqtype == 1) {
           client->substep = 0;
           if(http_parse_multipart_body(client, (unsigned char *)rbuffer, size) == -1) {
+            webserver_close_debug(client, "webserver_sync_receive: http_parse_multipart_body (first chunk) returned -1");
             client->step = WEBSERVER_CLIENT_CLOSE;
           }
         }
@@ -2110,10 +2152,12 @@ uint8_t webserver_sync_receive(struct webserver_t *client, uint8_t *rbuffer, uin
   if(client->step == WEBSERVER_CLIENT_ARGS) {
     if(client->reqtype == 0) {
       if(http_parse_body(client, (char *)rbuffer, size) == -1) {
+        webserver_close_debug(client, "webserver_sync_receive: http_parse_body returned -1");
         client->step = WEBSERVER_CLIENT_CLOSE;
       }
     } else if(client->reqtype == 1) {
       if(http_parse_multipart_body(client, (unsigned char *)rbuffer, size) == -1) {
+        webserver_close_debug(client, "webserver_sync_receive: http_parse_multipart_body returned -1");
         client->step = WEBSERVER_CLIENT_CLOSE;
       }
     }
@@ -2133,6 +2177,7 @@ err_t webserver_async_receive(void *arg, tcp_pcb *pcb, struct pbuf *data, err_t 
   if(data == NULL) {
     for(i=0;i<WEBSERVER_MAX_CLIENTS;i++) {
       if(clients[i].data.pcb == pcb) {
+        webserver_close_debug(&clients[i].data, "webserver_async_receive: tcp_recv got data==NULL, remote peer closed/reset the connection");
         webserver_client_close(&clients[i].data);
       }
     }
@@ -2158,12 +2203,14 @@ err_t webserver_async_receive(void *arg, tcp_pcb *pcb, struct pbuf *data, err_t 
             client->totallen -= 16;
             if(client->callback != NULL) {
               if(client->callback(client, NULL) == -1) {
+                webserver_close_debug(client, "webserver_async_receive: WRITE-step callback returned -1");
                 client->step = WEBSERVER_CLIENT_CLOSE;
                 return -1;
               }
               client->content++;
               client->ptr = 0;
             } else {
+              webserver_close_debug(client, "webserver_async_receive: WRITE-step but no callback registered");
               client->step = WEBSERVER_CLIENT_CLOSE;
               return -1;
             }
@@ -2195,6 +2242,7 @@ err_t webserver_poll(void *arg, struct tcp_pcb *pcb) {
   #if defined(ESP8266) || defined(ESP32)
 		loggingSerial.printf("Timeout webserver client: %s:%d", ipaddr_ntoa(&clients[i].data.pcb->remote_ip), clients[i].data.pcb->remote_port);
   #endif
+        webserver_close_debug(&clients[i].data, "webserver_poll: lastseen timeout exceeded (WEBSERVER_CLIENT_TIMEOUT)");
         clients[i].data.step = WEBSERVER_CLIENT_CLOSE;
         webserver_client_close(&clients[i].data);
       }
@@ -2321,9 +2369,11 @@ void webserver_loop(void) {
         loggingSerial.print(":");
         loggingSerial.println(clients[i].data.client->remotePort());
 #endif
+      webserver_close_debug(&clients[i].data, "webserver_loop: lastseen timeout exceeded (sync path)");
       clients[i].data.step = WEBSERVER_CLIENT_CLOSE;
     }
     if(!clients[i].data.client->connected()) {
+      webserver_close_debug(&clients[i].data, "webserver_loop: client->connected() is false (sync path)");
       clients[i].data.step = WEBSERVER_CLIENT_CLOSE;
     }
     switch(clients[i].data.step) {
@@ -2346,6 +2396,7 @@ void webserver_loop(void) {
             );
           }
         } else if(!clients[i].data.client->connected()) {
+          webserver_close_debug(&clients[i].data, "webserver_loop: client disconnected while reading header/args (sync path)");
           clients[i].data.step = WEBSERVER_CLIENT_CLOSE;
         } else {
           continue;
@@ -2359,6 +2410,7 @@ void webserver_loop(void) {
         if(clients[i].data.callback != NULL) {
           if(clients[i].data.step == WEBSERVER_CLIENT_WRITE) {
             if(clients[i].data.callback(&clients[i].data, NULL) == -1) {
+              webserver_close_debug(&clients[i].data, "webserver_loop: WRITE-step callback returned -1 (sync path)");
               clients[i].data.step = WEBSERVER_CLIENT_CLOSE;
             } else if(clients[i].data.content > 0) {
               clients[i].data.step = WEBSERVER_CLIENT_SENDING;
@@ -2369,6 +2421,7 @@ void webserver_loop(void) {
           }
           clients[i].data.ptr = 0;
         } else {
+          webserver_close_debug(&clients[i].data, "webserver_loop: WRITE-step but no callback registered (sync path)");
           clients[i].data.step = WEBSERVER_CLIENT_CLOSE;
           continue;
         }
