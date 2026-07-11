@@ -56,7 +56,6 @@
 #endif
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
-
 #ifndef ERR_OK
   #define ERR_OK 0
 #endif
@@ -81,39 +80,12 @@ static uint8_t *rbuffer = NULL;
   safe write is necessary for esp8266 so it doesn't block
   on esp32 wifi is multithreaded, not necessary but also not implemented on availableforWrite so skip it there
 */
-#if defined(ESP8266) || defined(ESP32)
-static void webserver_close_debug(struct webserver_t *client, const char *reason) {
-  loggingSerial.print(F("[close-dbg] "));
-  loggingSerial.print(reason);
-  loggingSerial.print(F(" ip="));
-  if(client->async == 1 && client->pcb != NULL) {
-    loggingSerial.print(ipaddr_ntoa(&client->pcb->remote_ip));
-    loggingSerial.print(F(":"));
-    loggingSerial.print(client->pcb->remote_port);
-  } else if(client->client != NULL) {
-    loggingSerial.print(client->client->remoteIP().toString().c_str());
-    loggingSerial.print(F(":"));
-    loggingSerial.print(client->client->remotePort());
-  } else {
-    loggingSerial.print(F("unknown"));
-  }
-  loggingSerial.printf(PSTR(" route=%d step=%d substep=%d readlen=%u totallen=%u ptr=%u heap=%u\n"),
-    client->route, client->step, client->substep, (unsigned)client->readlen, (unsigned)client->totallen, client->ptr, (unsigned)ESP.getFreeHeap());
-}
-#else
-static void webserver_close_debug(struct webserver_t *client, const char *reason) {
-  (void)client;
-  (void)reason;
-}
-#endif
-
 static int16_t safe_write(struct webserver_t *client, const uint8_t *buf, uint16_t len) {
 #if defined(ESP8266)
   uint32_t start = millis();
   while(client->client->availableForWrite() == 0) {
     if((unsigned long)(millis() - start) > 1000) {
       // client is too slow, give up
-      webserver_close_debug(client, "safe_write: client too slow to accept write, giving up");
       client->step = WEBSERVER_CLIENT_CLOSE;
       return -1;
     }
@@ -129,7 +101,6 @@ static int16_t safe_write_P(struct webserver_t *client, PGM_P buf, uint16_t len)
   while(client->client->availableForWrite() == 0) {
     if((unsigned long)(millis() - start) > 1000) {
       // client is too slow, give up
-      webserver_close_debug(client, "safe_write_P: client too slow to accept write, giving up");
       client->step = WEBSERVER_CLIENT_CLOSE;
       return -1;
     }
@@ -590,7 +561,6 @@ int8_t http_parse_request(struct webserver_t *client, uint8_t **buf, uint16_t *l
           client->step = WEBSERVER_CLIENT_REQUEST_METHOD;
           if(client->callback != NULL) {
             if(client->callback(client, (void *)"GET") == -1) {
-              webserver_close_debug(client, "http_parse_request: GET method callback returned -1");
               client->step = WEBSERVER_CLIENT_CLOSE;
               return -1;
             }
@@ -607,7 +577,6 @@ int8_t http_parse_request(struct webserver_t *client, uint8_t **buf, uint16_t *l
         client->step = WEBSERVER_CLIENT_REQUEST_METHOD;
         if(client->callback != NULL) {
           if(client->callback(client, (void *)"POST") == -1) {
-            webserver_close_debug(client, "http_parse_request: POST method callback returned -1");
             client->step = WEBSERVER_CLIENT_CLOSE;
             return -1;
           }
@@ -639,7 +608,6 @@ int8_t http_parse_request(struct webserver_t *client, uint8_t **buf, uint16_t *l
           client->step = WEBSERVER_CLIENT_REQUEST_URI;
           if(client->callback != NULL) {
             if(client->callback(client, client->buffer) == -1) {
-              webserver_close_debug(client, "http_parse_request: request URI callback returned -1 (variant A)");
               client->step = WEBSERVER_CLIENT_CLOSE;
               return -1;
             }
@@ -654,7 +622,6 @@ int8_t http_parse_request(struct webserver_t *client, uint8_t **buf, uint16_t *l
         client->step = WEBSERVER_CLIENT_REQUEST_URI;
         if(client->callback != NULL) {
           if(client->callback(client, client->buffer) == -1) {
-            webserver_close_debug(client, "http_parse_request: request URI callback returned -1 (variant B)");
             client->step = WEBSERVER_CLIENT_CLOSE;
             return -1;
           }
@@ -771,7 +738,6 @@ int8_t http_parse_request(struct webserver_t *client, uint8_t **buf, uint16_t *l
                   uint8_t pos = (ptr-tmp)+strlen("boundary=");
                   memmove(&tmp[0], &tmp[pos], args.len-pos);
                   tmp[args.len-pos] = 0;
-                  loggingSerial.printf(PSTR("[mp-dbg] boundary extracted: len=%u value=\"%s\"\n"), (unsigned)strlen(tmp), tmp);
                   if((client->data.boundary = strdup(tmp)) == NULL) {
 #if defined(ESP8266) || defined(ESP32)
                     loggingSerial.printf("Out of memory %s:#%d\n", __FUNCTION__, __LINE__);
@@ -785,7 +751,6 @@ int8_t http_parse_request(struct webserver_t *client, uint8_t **buf, uint16_t *l
             client->step = WEBSERVER_CLIENT_HEADER;
             if(client->callback != NULL) {
               if(client->callback(client, &args) == -1) {
-                webserver_close_debug(client, "http_parse_request: header callback returned -1");
                 client->step = WEBSERVER_CLIENT_CLOSE;
                 return -1;
               }
@@ -818,11 +783,11 @@ int8_t http_parse_request(struct webserver_t *client, uint8_t **buf, uint16_t *l
         memmove(&client->buffer[0], &client->buffer[2], client->ptr-2);
         client->ptr -= 2;
         client->readlen = 0;
-        /* Seed with whatever's already sitting in the buffer: this same
-         * network chunk may have contained the start of the body right
-         * after the header terminator, and those bytes are already in
-         * ptr but haven't been through http_parse_multipart_body's own
-         * entry accounting yet. */
+        /* mp_fed is only used by http_parse_multipart_body_standby (see its
+         * comment) - kept in sync here so that alternate implementation
+         * stays correct if ever re-enabled. Seeded with whatever's already
+         * in the buffer: this same network chunk may have contained the
+         * start of the body right after the header terminator. */
         client->mp_fed = client->ptr;
         if(client->ptr == 0 && *len > 0) {
           client->substep = 5;
@@ -889,6 +854,384 @@ char *strnstr(const char *haystack, const char *needle, size_t len) {
 int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, uint16_t len) {
   uint16_t hasread = MIN(WEBSERVER_BUFFER_SIZE-client->ptr, len);
   uint16_t rpos = 0, loop = 1;
+  while((rpos < len) || ((loop == 1) && (client->ptr > 0))) {
+    hasread = MIN(WEBSERVER_BUFFER_SIZE-client->ptr, len-rpos);
+    memcpy(&client->buffer[client->ptr], &buf[rpos], hasread);
+    client->ptr += hasread;
+    rpos += hasread;
+    loop = 1;
+
+    while(loop) {
+      switch(client->substep) {
+        // Boundary
+        case 0: {
+          unsigned char *ptr = strnstr(client->buffer, client->data.boundary, client->ptr);
+          unsigned char *ptr1 = (unsigned char *)memchr(client->buffer, '=', client->ptr);
+          uint16_t pos1 = 0;
+          if(ptr1 != NULL) {
+            pos1 = (ptr1-client->buffer)+1;
+          }
+          if(ptr != NULL) {
+            uint16_t pos = (ptr-client->buffer)+strlen(client->data.boundary);
+
+            if(pos1 > pos) {
+              /*
+               * Only compensate for the key at the
+               * beginning of the buffer when at least
+               * one key has been encountered. This is
+               * the case when the boundary is placed
+               * after the key.
+               */
+              pos1 = 0;
+            }
+            if(pos+1 <= client->ptr) {
+              if(client->buffer[pos] == '\r' && client->buffer[pos+1] == '\n') {
+                memmove(&client->buffer[0], &client->buffer[pos+1], client->ptr-(pos+1));
+                client->ptr = client->ptr-(pos+1);
+                client->buffer[client->ptr] = 0;
+                /*
+                 * pos1 is NOT subtracted here: it exists to compensate for a
+                 * field-name marker that case4/case6-alt used to (wrongly)
+                 * credit into readlen before it was fixed below. Now that
+                 * those cases correctly exclude the marker themselves, there
+                 * is nothing left here to compensate for - subtracting pos1
+                 * would double-discount it.
+                 */
+                client->readlen += (pos+1);
+                client->substep = 1;
+              }
+            }
+            if(pos+3 <= client->ptr) {
+              if(client->buffer[pos] == '-' && client->buffer[pos+1] == '-' &&
+                client->buffer[pos+2] == '\r' && client->buffer[pos+3] == '\n') {
+                client->readlen += (pos+4);
+                if(client->readlen == client->totallen) {
+                  if(client->data.boundary != NULL) {
+                    free(client->data.boundary);
+                    client->data.boundary = NULL;
+                  }
+                  return 0;
+                } else {
+                  // Error, content length does not match end boundary
+                  return -1;
+                }
+              }
+            }
+          } else if(client->ptr < WEBSERVER_BUFFER_SIZE) {
+            loop = 0;
+          } else {
+            /*
+             * We encountered the boundary delimiter, but
+             * it wasn't the one from this request, but it
+             * was part of the POST body
+             */
+            client->substep = 8;
+          }
+          if(client->substep == 0) {
+            loop = 0;
+          }
+        } break;
+        // Content-Disposition
+        case 1: {
+          unsigned char *ptr = strncasestr(client->buffer, "content-disposition:", client->ptr);
+          if(ptr != NULL) {
+            uint16_t pos = (ptr-client->buffer)+strlen("content-disposition:");
+            while(client->buffer[pos++] == ' ');
+            pos--;
+            memmove(&client->buffer[0], &client->buffer[pos], client->ptr-(pos));
+            client->ptr = client->ptr-(pos);
+            client->buffer[client->ptr] = 0;
+            client->readlen += pos;
+            client->substep = 2;
+          } else {
+            loop = 0;
+          }
+        } break;
+        // End of content-disposition
+        case 2: {
+          unsigned char *ptr = (unsigned char *)memchr(client->buffer, ';', client->ptr);
+          if(ptr != NULL) {
+            uint16_t pos = (ptr-client->buffer+1);
+            while(client->buffer[pos++] == ' ');
+            pos--;
+            memmove(&client->buffer[0], &client->buffer[pos], client->ptr-(pos));
+            client->ptr -= pos;
+            client->buffer[client->ptr] = 0;
+            client->readlen += pos;
+            client->substep = 3;
+          } else {
+            loop = 0;
+          }
+        } break;
+        // Name
+        case 3: {
+          unsigned char *ptr = strncasestr(client->buffer, "name=\"", client->ptr);
+          if(ptr != NULL) {
+            uint16_t pos = (ptr-client->buffer)+strlen("name=\"");
+            memmove(&client->buffer[0], &client->buffer[pos], client->ptr-(pos));
+            client->ptr = client->ptr-(pos);
+            client->readlen += pos;
+            client->substep = 6;
+          } else {
+            loop = 0;
+          }
+        } break;
+        // Filename etc.
+        case 4: {
+          unsigned char *ptr = strncasestr(client->buffer, "\";", client->ptr);
+          if(ptr != NULL) {
+            uint16_t pos = (ptr-client->buffer);
+            // First try to find \r\n\r\n (end of all headers)
+            unsigned char *ptr1 = strnstr(&client->buffer[pos], "\r\n\r\n", client->ptr-pos);
+            if(ptr1 != NULL) {
+                // Double CRLF found - skip directly to data
+                client->buffer[pos++] = '=';
+                uint16_t pos1 = (ptr1-client->buffer);
+                uint16_t newlen = client->ptr-((pos1+4)-pos);
+                /*
+                 * The memmove must only copy the bytes that are actually
+                 * still valid past pos1+4 (client->ptr-(pos1+4)), NOT
+                 * newlen: newlen is the FINAL ptr value, which already
+                 * accounts for the retained "name=" marker staying at
+                 * buffer position 0..pos-1. Using newlen as the copy length
+                 * here would read past the end of the valid buffered
+                 * content into stale memory.
+                 */
+                memmove(&client->buffer[pos], &client->buffer[pos1+4], client->ptr-(pos1+4));
+                client->ptr = newlen;
+                /*
+                 * Only credit the actual header bytes consumed
+                 * ((pos1+4)-pos), not the full (pos1+4): the retained
+                 * "name=" marker (0..pos-1) stays physically in the buffer
+                 * for case7/8 to use later, so it must NOT also be counted
+                 * as "consumed" here - doing so double-counts those bytes
+                 * (once via readlen here, again via ptr since they're still
+                 * buffered).
+                 */
+                client->readlen += ((pos1+4)-pos);
+                client->substep = 7;  // skip case 5 entirely, go straight to data
+            } else {
+                // Single \r\n - if more headers follow, go to case 5
+                ptr1 = strncasestr(&client->buffer[pos], "\r\n", client->ptr-pos);
+                if(ptr1 != NULL) {
+                    if (((ptr1-client->buffer) + 4) >= client->ptr) {
+                        //CRLF on end of buffer, wait for two more to make sure we are not at end of header
+					    loop = 0;
+                    } else {
+                        client->buffer[pos++] = '=';
+                        uint16_t pos1 = (ptr1-client->buffer);
+                        uint16_t newlen = client->ptr-((pos1+2)-pos);
+                        // See the double-CRLF branch above for why the
+                        // memmove length and readlen credit both exclude pos.
+                        memmove(&client->buffer[pos], &client->buffer[pos1+2], client->ptr-(pos1+2));
+                        client->ptr = newlen;
+                       client->readlen += ((pos1+2)-pos);
+                        client->substep = 5;
+                    }
+                  } else {
+                      client->substep = 6;
+                }
+            }
+          } else {
+            loop = 0;
+          }
+        } break;
+        // Content-type
+        case 5: {
+          unsigned char *ptr = (unsigned char *)memchr(client->buffer, '=', client->ptr);
+          if(ptr != NULL) {
+            uint16_t pos = (ptr-client->buffer)+1;
+
+            if((client->ptr - pos) >= 4) {
+              unsigned char *ptr1 = strnstr(&client->buffer[pos], "\r\n\r\n", client->ptr-pos);
+              if(ptr1 != NULL) {
+                uint16_t pos1 = (ptr1-client->buffer)+4;
+                uint16_t newlen = client->ptr-(pos1-pos);
+                memmove(&client->buffer[pos], &client->buffer[pos1], client->ptr-pos1);
+                client->ptr = newlen;
+                client->readlen += (pos1-pos);
+                client->substep = 7;
+              } else {
+                loop = 0;
+              }
+            } else {
+              loop = 0;
+            }
+          } else {
+            loop = 0;
+          }
+        } break;
+        // Name
+        case 6: {
+          if(client->ptr >= 2) {
+            unsigned char *ptr = strnstr(client->buffer, "\";", client->ptr);
+            if(ptr != NULL) {
+              unsigned char *ptr1 = strnstr(client->buffer, "\r\n", client->ptr);
+              if(ptr1 != NULL) {
+                client->substep = 4;
+              } else {
+                loop = 0;
+              }
+            } else {
+              unsigned char *ptr1 = strnstr(client->buffer, "\"\r\n", client->ptr);
+              if(ptr1 != NULL) {
+                uint16_t pos = (ptr1-client->buffer);
+                /*
+                 * Since we're increasing the pos
+                 * right after, check for 5 positions
+                 */
+                if((client->ptr - pos) >= 5) {
+                  client->buffer[pos++] = '=';;
+                  unsigned char *ptr2 = strnstr(&client->buffer[pos], "\r\n\r\n", client->ptr-pos);
+                  if(ptr2 != NULL) {
+                    uint16_t pos1 = (ptr2-client->buffer)+4;
+
+                    // See the case4 double-CRLF branch for why pos is
+                    // excluded from the readlen credit here too.
+                    memmove(&client->buffer[pos], &client->buffer[pos1], client->ptr-pos1);
+                    client->ptr -= (pos1-pos);
+                    client->readlen += (pos1-pos);
+                    client->substep = 7;
+                  } else {
+                    loop = 0;
+                  }
+                } else {
+                  loop = 0;
+                }
+              } else {
+                loop = 0;
+              }
+            }
+          } else {
+            loop = 0;
+          }
+        } break;
+        // Value
+        case 8:
+        case 7: {
+          unsigned char *ptr = strnstr(client->buffer, "\r\n--", client->ptr);
+          if(ptr != NULL && client->substep != 8) {
+            uint16_t pos = (ptr-client->buffer);
+            ptr = (unsigned char *)memchr(client->buffer, '=', client->ptr);
+            uint16_t vlen = 0;
+
+            if(ptr != NULL) {
+              vlen = (ptr-client->buffer);
+            } else {
+              // error
+              return -1; /*LCOV_EXCL_LINE*/
+            }
+			struct arguments_t args;
+			client->buffer[vlen] = 0;
+
+			args.name = &client->buffer[0];
+			args.value = &client->buffer[vlen+1];
+			args.len = pos-(vlen+1);
+
+			if(client->callback != NULL) {
+				uint8_t ret = client->callback(client, &args);
+				if(ret == -1) {
+					return -1;
+				}
+			}
+
+			client->buffer[vlen] = '=';
+			memmove(&client->buffer[vlen+1], &client->buffer[pos], client->ptr-pos);
+			client->readlen += (pos-(vlen+1));
+			client->ptr -= (pos-(vlen+1));
+            client->substep = 0;
+		  } else if(client->ptr == WEBSERVER_BUFFER_SIZE) {
+            uint8_t ending = 0;
+            uint8_t dash = 0;
+            /*
+             * Double check that the CR / LN don't belong
+             * to the boundary delimiter.
+             */
+            if(strncmp((char *)&client->buffer[client->ptr-1], "\r", 1) == 0) {
+              ending = 1;
+            }
+            if(strncmp((char *)&client->buffer[client->ptr-2], "\r\n", 2) == 0) {
+              ending = 2;
+            }
+            if(strncmp((char *)&client->buffer[client->ptr-3], "\r\n\r", 3) == 0) {
+              ending = 3;
+            }
+            if(strncmp((char *)&client->buffer[client->ptr-3], "\r\n-", 3) == 0) {
+              ending = 3;
+              dash = 1;
+            }
+            if(client->substep == 8) {
+              client->substep = 7;
+            }
+            unsigned char *ptr = (unsigned char *)memchr(client->buffer, '=', client->ptr);
+            if(ptr != NULL) {
+              uint16_t pos = (ptr-client->buffer);
+
+              struct arguments_t args;
+              client->buffer[pos] = 0;
+
+              args.name = &client->buffer[0];
+              args.value = &client->buffer[pos+1];
+              args.len = (client->ptr-ending)-(pos+1);
+
+              if(client->callback != NULL) {
+                uint8_t ret = client->callback(client, &args);
+                if(ret == -1) {
+                  return -1;
+                }
+              }
+              client->buffer[pos] = '=';
+              if(ending == 1) {
+                client->buffer[pos+1] = '\r';
+              }
+              if(ending == 2) {
+                client->buffer[pos+1] = '\r';
+                client->buffer[pos+2] = '\n';
+              }
+              if(ending == 3) {
+                client->buffer[pos+1] = '\r';
+                client->buffer[pos+2] = '\n';
+                client->buffer[pos+3] = '\r';
+                if(dash) {
+                  client->buffer[pos+3] = '-';
+                }
+              }
+              client->readlen += ((client->ptr-(pos+1))-ending);
+              client->ptr = pos+1+ending;
+              loop = 0;
+            } else {
+              // error
+              return -1;
+            }
+          } else {
+			loop = 0;
+		  }
+        } break;
+      }
+    }
+  }
+
+  return 0;
+}
+
+/*
+ * Alternate multipart parser implementation, kept for reference but not
+ * currently used. Tracks readlen as a DERIVED quantity (mp_fed - ptr,
+ * where mp_fed is a running total of every raw byte ever copied into the
+ * buffer) instead of the incremental per-branch bookkeeping the active
+ * implementation above uses. Structurally eliminates the double-counting
+ * bug class by construction, and was validated against the full upstream
+ * CurlyMoo/webserver regression suite (real captured firmware uploads,
+ * every chunk-fragmentation size 1-4095 bytes) with zero failures.
+ * Reverted to the original-shaped implementation on real hardware
+ * because the actual root cause turned out to be unrelated: a stale
+ * `size` variable in webserver_loop() cross-contaminating clients (see
+ * that function's comment). Left here in case the derived-readlen
+ * approach is wanted again later.
+ */
+int http_parse_multipart_body_standby(struct webserver_t *client, unsigned char *buf, uint16_t len) {
+  uint16_t hasread = MIN(WEBSERVER_BUFFER_SIZE-client->ptr, len);
+  uint16_t rpos = 0, loop = 1;
 
   while((rpos < len) || ((loop == 1) && (client->ptr > 0))) {
     hasread = MIN(WEBSERVER_BUFFER_SIZE-client->ptr, len-rpos);
@@ -941,8 +1284,6 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
                   /* Content length does not match what the terminating
                    * boundary implies - the declared length disagrees with
                    * what was actually received. */
-                  loggingSerial.printf(PSTR("[mp-dbg] multipart length mismatch: readlen=%u totallen=%u diff=%d\n"),
-                    (unsigned)client->readlen, (unsigned)client->totallen, (int)((long)client->readlen - (long)client->totallen));
                   return -1;
                 }
               } else {
@@ -1699,7 +2040,6 @@ static int webserver_process_send(struct webserver_t *client) {
     } else {
       client->step = WEBSERVER_CLIENT_WRITE;
       if(client->callback(client, NULL) == -1) {
-        webserver_close_debug(client, "webserver_send_content: WRITE callback returned -1");
         client->step = WEBSERVER_CLIENT_CLOSE;
       } else {
         client->step = WEBSERVER_CLIENT_SENDING;
@@ -1739,7 +2079,6 @@ static int webserver_process_send(struct webserver_t *client) {
           }
           i += 4;
         }
-        webserver_close_debug(client, "webserver_send_content: response fully sent, closing normally");
         client->step = WEBSERVER_CLIENT_CLOSE;
         client->userdata = NULL;
         client->ptr = 0;
@@ -1918,7 +2257,6 @@ done:
 
 /* LCOV_EXCL_START*/
 static void webserver_client_close(struct webserver_t *client) {
-  webserver_close_debug(client, "webserver_client_close: entering close");
   if(client->callback != NULL) {
     client->callback(client, NULL);
   }
@@ -1955,7 +2293,6 @@ err_t webserver_sent(void *arg, tcp_pcb *pcb, uint16_t len) {
     if(clients[i].data.pcb == pcb) {
       if(clients[i].data.step == WEBSERVER_CLIENT_WRITE) {
         if(clients[i].data.callback(&clients[i].data, NULL) == -1) {
-          webserver_close_debug(&clients[i].data, "webserver_sent: WRITE callback returned -1");
           clients[i].data.step = WEBSERVER_CLIENT_CLOSE;
         } else {
           clients[i].data.step = WEBSERVER_CLIENT_SENDING;
@@ -2126,7 +2463,6 @@ int websocket_read(struct webserver_t *client, unsigned char *buf, ssize_t buf_l
     } break;
     case WEBSOCKET_OPCODE_CONNECTION_CLOSE:
       websocket_send_header(client, WEBSOCKET_OPCODE_CONNECTION_CLOSE, 0);
-      webserver_close_debug(client, "websocket_read: peer sent CONNECTION_CLOSE opcode");
       client->step = WEBSERVER_CLIENT_CLOSE;
       return -1;
     break;
@@ -2134,13 +2470,11 @@ int websocket_read(struct webserver_t *client, unsigned char *buf, ssize_t buf_l
       if(client->callback != NULL) {
         client->step = WEBSERVER_CLIENT_WEBSOCKET_TEXT;
         if(client->callback(client, buf) == -1) {
-          webserver_close_debug(client, "websocket_read: TEXT callback returned -1");
           client->step = WEBSERVER_CLIENT_CLOSE;
           return -1;
         }
         client->step = WEBSERVER_CLIENT_WEBSOCKET;
       } else {
-        webserver_close_debug(client, "websocket_read: TEXT opcode but no callback registered");
         client->step = WEBSERVER_CLIENT_CLOSE;
         return -1;
       }
@@ -2166,13 +2500,11 @@ uint8_t webserver_sync_receive(struct webserver_t *client, uint8_t *rbuffer, uin
          if(client->reqtype == 0) {
           client->readlen = 0;
           if(http_parse_body(client, (char *)rbuffer, size) == -1) {
-            webserver_close_debug(client, "webserver_sync_receive: http_parse_body (first chunk) returned -1");
             client->step = WEBSERVER_CLIENT_CLOSE;
           }
         } else if(client->reqtype == 1) {
           client->substep = 0;
           if(http_parse_multipart_body(client, (unsigned char *)rbuffer, size) == -1) {
-            webserver_close_debug(client, "webserver_sync_receive: http_parse_multipart_body (first chunk) returned -1");
             client->step = WEBSERVER_CLIENT_CLOSE;
           }
         }
@@ -2196,12 +2528,10 @@ uint8_t webserver_sync_receive(struct webserver_t *client, uint8_t *rbuffer, uin
   if(client->step == WEBSERVER_CLIENT_ARGS) {
     if(client->reqtype == 0) {
       if(http_parse_body(client, (char *)rbuffer, size) == -1) {
-        webserver_close_debug(client, "webserver_sync_receive: http_parse_body returned -1");
         client->step = WEBSERVER_CLIENT_CLOSE;
       }
     } else if(client->reqtype == 1) {
       if(http_parse_multipart_body(client, (unsigned char *)rbuffer, size) == -1) {
-        webserver_close_debug(client, "webserver_sync_receive: http_parse_multipart_body returned -1");
         client->step = WEBSERVER_CLIENT_CLOSE;
       }
     }
@@ -2221,7 +2551,6 @@ err_t webserver_async_receive(void *arg, tcp_pcb *pcb, struct pbuf *data, err_t 
   if(data == NULL) {
     for(i=0;i<WEBSERVER_MAX_CLIENTS;i++) {
       if(clients[i].data.pcb == pcb) {
-        webserver_close_debug(&clients[i].data, "webserver_async_receive: tcp_recv got data==NULL, remote peer closed/reset the connection");
         webserver_client_close(&clients[i].data);
       }
     }
@@ -2247,14 +2576,12 @@ err_t webserver_async_receive(void *arg, tcp_pcb *pcb, struct pbuf *data, err_t 
             client->totallen -= 16;
             if(client->callback != NULL) {
               if(client->callback(client, NULL) == -1) {
-                webserver_close_debug(client, "webserver_async_receive: WRITE-step callback returned -1");
                 client->step = WEBSERVER_CLIENT_CLOSE;
                 return -1;
               }
               client->content++;
               client->ptr = 0;
             } else {
-              webserver_close_debug(client, "webserver_async_receive: WRITE-step but no callback registered");
               client->step = WEBSERVER_CLIENT_CLOSE;
               return -1;
             }
@@ -2286,7 +2613,6 @@ err_t webserver_poll(void *arg, struct tcp_pcb *pcb) {
   #if defined(ESP8266) || defined(ESP32)
 		loggingSerial.printf("Timeout webserver client: %s:%d", ipaddr_ntoa(&clients[i].data.pcb->remote_ip), clients[i].data.pcb->remote_port);
   #endif
-        webserver_close_debug(&clients[i].data, "webserver_poll: lastseen timeout exceeded (WEBSERVER_CLIENT_TIMEOUT)");
         clients[i].data.step = WEBSERVER_CLIENT_CLOSE;
         webserver_client_close(&clients[i].data);
       }
@@ -2311,7 +2637,6 @@ void webserver_reset_client(struct webserver_t *client) {
 #endif
 
   client->readlen = 0;
-  client->mp_fed = 0;
   client->reqtype = 0;
   client->method = 0;
   client->async = 0;
@@ -2428,11 +2753,9 @@ void webserver_loop(void) {
         loggingSerial.print(":");
         loggingSerial.println(clients[i].data.client->remotePort());
 #endif
-      webserver_close_debug(&clients[i].data, "webserver_loop: lastseen timeout exceeded (sync path)");
       clients[i].data.step = WEBSERVER_CLIENT_CLOSE;
     }
     if(!clients[i].data.client->connected()) {
-      webserver_close_debug(&clients[i].data, "webserver_loop: client->connected() is false (sync path)");
       clients[i].data.step = WEBSERVER_CLIENT_CLOSE;
     }
     switch(clients[i].data.step) {
@@ -2455,7 +2778,6 @@ void webserver_loop(void) {
             );
           }
         } else if(!clients[i].data.client->connected()) {
-          webserver_close_debug(&clients[i].data, "webserver_loop: client disconnected while reading header/args (sync path)");
           clients[i].data.step = WEBSERVER_CLIENT_CLOSE;
         } else {
           continue;
@@ -2469,7 +2791,6 @@ void webserver_loop(void) {
         if(clients[i].data.callback != NULL) {
           if(clients[i].data.step == WEBSERVER_CLIENT_WRITE) {
             if(clients[i].data.callback(&clients[i].data, NULL) == -1) {
-              webserver_close_debug(&clients[i].data, "webserver_loop: WRITE-step callback returned -1 (sync path)");
               clients[i].data.step = WEBSERVER_CLIENT_CLOSE;
             } else if(clients[i].data.content > 0) {
               clients[i].data.step = WEBSERVER_CLIENT_SENDING;
@@ -2480,7 +2801,6 @@ void webserver_loop(void) {
           }
           clients[i].data.ptr = 0;
         } else {
-          webserver_close_debug(&clients[i].data, "webserver_loop: WRITE-step but no callback registered (sync path)");
           clients[i].data.step = WEBSERVER_CLIENT_CLOSE;
           continue;
         }

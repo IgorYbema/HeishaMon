@@ -1105,22 +1105,16 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
 #endif
           } else if (strcmp_P((char *)dat, PSTR("/firmware")) == 0) {
             if (!Update.isRunning()) {
-              loggingSerial.printf(PSTR("[fw-dbg] /firmware POST starting: freeSketchSpace=%u updateMaxSize=%u freeHeap=%u contentLength=%u\n"),
-                (unsigned)ESP.getFreeSketchSpace(), (unsigned)((ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000), (unsigned)ESP.getFreeHeap(), (unsigned)client->totallen);
 #ifdef ESP8266
               Update.runAsync(true);
 #endif
               if (!Update.begin((ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000)) {
-                loggingSerial.println(PSTR("[fw-dbg] Update.begin() failed"));
                 Update.printError(loggingSerial);
                 return -1;
               } else {
-                loggingSerial.println(PSTR("[fw-dbg] Update.begin() succeeded"));
                 client->route = 150;
               }
-            } else {
-              loggingSerial.printf(PSTR("[fw-dbg] New firmware update client, while previous isn't finished yet! progress=%u size=%u hasError=%d freeHeap=%u\n"),
-                (unsigned)Update.progress(), (unsigned)Update.size(), Update.hasError(), (unsigned)ESP.getFreeHeap());
+            } else { 
               loggingSerial.println(PSTR("New firmware update client, while previous isn't finished yet! Assume broken connection, abort!"));
               Update.end();
               return -1;
@@ -1220,15 +1214,11 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
                   sprintf_P(log_msg, PSTR("Firmware MD5 expected: %s"), md5);
                   log_message(log_msg);
                   if (!Update.setMD5(md5)) {
-                    loggingSerial.printf(PSTR("[fw-dbg] Update.setMD5(\"%s\") failed\n"), md5);
                     log_message(_F("Failed to set expected update file MD5!"));
                     Update.end(false);
                   }
                 } else if (strcmp((char *)args->name, "firmware") == 0) {
-                  size_t written = Update.write((uint8_t *)args->value, args->len);
-                  if (written != args->len) {
-                    loggingSerial.printf(PSTR("[fw-dbg] Update.write length mismatch! requested=%u written=%u readlen=%u totallen=%u progress=%u size=%u freeHeap=%u\n"),
-                      (unsigned)args->len, (unsigned)written, (unsigned)client->readlen, (unsigned)client->totallen, (unsigned)Update.progress(), (unsigned)Update.size(), (unsigned)ESP.getFreeHeap());
+                  if (Update.write((uint8_t *)args->value, args->len) != args->len) {
                     Update.printError(loggingSerial);
                     Update.end(false);
                   } else {
@@ -1236,14 +1226,10 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
                       uploadpercentage = (unsigned int)(((float)client->readlen / (float)client->totallen) * 20);
                       sprintf_P(log_msg, PSTR("Uploading new firmware: %d%%"), uploadpercentage * 5);
                       log_message(log_msg);
-                      loggingSerial.printf(PSTR("[fw-dbg] chunk ok len=%u readlen=%u totallen=%u progress=%u size=%u freeHeap=%u\n"),
-                        (unsigned)args->len, (unsigned)client->readlen, (unsigned)client->totallen, (unsigned)Update.progress(), (unsigned)Update.size(), (unsigned)ESP.getFreeHeap());
                     }
                   }
                 }
               } else {
-                loggingSerial.printf(PSTR("[fw-dbg] New firmware POST data but update not running anymore! name=%s len=%u readlen=%u totallen=%u hasError=%d freeHeap=%u\n"),
-                  args->name, (unsigned)args->len, (unsigned)client->readlen, (unsigned)client->totallen, Update.hasError(), (unsigned)ESP.getFreeHeap());
                 log_message((char*)"New firmware POST data but update not running anymore!");
               }
             } break;
@@ -1392,19 +1378,14 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
           case 150: {
               log_message((char*)"In /firmware client write part");
               if (Update.isRunning()) {
-                loggingSerial.printf(PSTR("[fw-dbg] finalizing update: readlen=%u totallen=%u progress=%u size=%u freeHeap=%u\n"),
-                  (unsigned)client->readlen, (unsigned)client->totallen, (unsigned)Update.progress(), (unsigned)Update.size(), (unsigned)ESP.getFreeHeap());
                 if (Update.end(true)) {
                   log_message((char*)"Firmware update success");
                   //timerqueue_insert(2, 0, -2); // Start reboot sequence
                   return showFirmwareSuccess(client);
                 } else {
-                  loggingSerial.println(PSTR("[fw-dbg] Update.end(true) failed"));
                   Update.printError(loggingSerial);
                   return showFirmwareFail(client);
                 }
-              } else {
-                loggingSerial.println(PSTR("[fw-dbg] WRITE-step for /firmware but Update is not running"));
               }
               return 0;
             } break;
