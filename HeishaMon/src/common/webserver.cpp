@@ -954,12 +954,15 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
             if(pos+1 <= client->ptr) {
               if(client->buffer[pos] == '\r' && client->buffer[pos+1] == '\n') {
                 loggingSerial.printf(PSTR("[mp-dbg] case0 mid-boundary: ptr=%u pos=%u pos1_raw=%u pos1_used=%u readlen_before=%u readlen_delta=%u\n"),
-                  (unsigned)client->ptr, (unsigned)pos, (unsigned)pos1_raw, (unsigned)pos1, (unsigned)client->readlen, (unsigned)((pos+1)-pos1));
+                  (unsigned)client->ptr, (unsigned)pos, (unsigned)pos1_raw, (unsigned)pos1, (unsigned)client->readlen, (unsigned)(pos+1));
                 mp_hexdump("case0 mid-boundary buffer[0..ptr]", client->buffer, client->ptr, 96);
                 memmove(&client->buffer[0], &client->buffer[pos+1], client->ptr-(pos+1));
                 client->ptr = client->ptr-(pos+1);
                 client->buffer[client->ptr] = 0;
-                client->readlen += ((pos+1)-pos1);
+                // NOTE: no longer subtracting pos1 here - case4/case6-alt no
+                // longer credit the retained marker to readlen (fixed in
+                // 519a734), so there is nothing left to compensate for.
+                client->readlen += (pos+1);
                 client->substep = 1;
               }
             }
@@ -967,13 +970,14 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
               if(client->buffer[pos] == '-' && client->buffer[pos+1] == '-' &&
                 client->buffer[pos+2] == '\r' && client->buffer[pos+3] == '\n') {
                 loggingSerial.printf(PSTR("[mp-dbg] case0 FINAL-boundary: ptr=%u pos=%u pos1_raw=%u pos1_used=%u readlen_before=%u readlen_delta=%u totallen=%u boundary=\"%s\"\n"),
-                  (unsigned)client->ptr, (unsigned)pos, (unsigned)pos1_raw, (unsigned)pos1, (unsigned)client->readlen, (unsigned)((pos+4)-pos1), (unsigned)client->totallen, client->data.boundary);
+                  (unsigned)client->ptr, (unsigned)pos, (unsigned)pos1_raw, (unsigned)pos1, (unsigned)client->readlen, (unsigned)(pos+4), (unsigned)client->totallen, client->data.boundary);
                 mp_hexdump("case0 FINAL-boundary buffer[0..ptr]", client->buffer, client->ptr, 96);
                 loggingSerial.printf(PSTR("[mp-dbg] case8 split summary: total_splits=%lu nonzero_ending_count=%lu cumulative_held_bytes=%lu\n"),
                   g_case8_split_count, g_ending_nonzero_count, g_ending_bytes_total);
                 loggingSerial.printf(PSTR("[mp-dbg] pre-final invariant check: total_fed_so_far=%lu accounted(readlen+ptr)=%u invariant_diff=%ld (ptr here still includes the unconsumed boundary text)\n"),
                   g_total_bytes_fed, (unsigned)(client->readlen + client->ptr), (long)g_total_bytes_fed - (long)(client->readlen + client->ptr));
-                client->readlen += ((pos+4)-(pos1));
+                // NOTE: no longer subtracting pos1 here - see case0 mid-boundary comment above
+                client->readlen += (pos+4);
                 if(client->readlen == client->totallen) {
                   if(client->data.boundary != NULL) {
                     free(client->data.boundary);
