@@ -2397,6 +2397,20 @@ void webserver_loop(void) {
   uint8_t i = 0;
 
   for(i=0;i<WEBSERVER_MAX_CLIENTS;i++) {
+    /*
+     * size (and the shared rbuffer it indexes into) must be reset for every
+     * client, not just once per call: if a client at an earlier index reads
+     * real data this pass and sets size > 0, and a later client in this same
+     * pass is connected() but not yet available() (the common case for a
+     * mostly-idle websocket), the read below is skipped and size/rbuffer
+     * would otherwise still hold the EARLIER client's leftover bytes - which
+     * then get fed into webserver_sync_receive() below as if they were
+     * freshly received data for this client. In the reverse ordering, this
+     * silently injects a few stray bytes from another connection (e.g. a
+     * websocket ping/pong) into an in-progress firmware upload's multipart
+     * stream, corrupting the byte count against the declared Content-Length.
+     */
+    size = 0;
     if(clients[i].data.step == 0 || clients[i].data.async == 1) {
       continue;
     }
