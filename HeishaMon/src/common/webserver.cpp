@@ -883,14 +883,26 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
                 memmove(&client->buffer[0], &client->buffer[pos+1], client->ptr-(pos+1));
                 client->ptr = client->ptr-(pos+1);
                 client->buffer[client->ptr] = 0;
-                client->readlen += ((pos+1)-pos1);
+                /*
+                 * pos1 is NOT subtracted here: it exists to compensate for a
+                 * field-name marker that case 4/case 6's short-name path used
+                 * to (wrongly) credit into readlen. Now that those cases
+                 * correctly exclude the marker themselves (see their fixes
+                 * below), there is nothing left here to compensate for -
+                 * subtracting pos1 would double-discount it and desync
+                 * readlen from the true byte count whenever a field's name
+                 * marker is still retained in the buffer.
+                 */
+                client->readlen += (pos+1);
                 client->substep = 1;
               }
             }
             if(pos+3 <= client->ptr) {
               if(client->buffer[pos] == '-' && client->buffer[pos+1] == '-' &&
                 client->buffer[pos+2] == '\r' && client->buffer[pos+3] == '\n') {
-                client->readlen += ((pos+4)-(pos1));
+                // See the comment on the mid-boundary branch above for why
+                // pos1 is not subtracted here either.
+                client->readlen += (pos+4);
                 if(client->readlen == client->totallen) {
                   if(client->data.boundary != NULL) {
                     free(client->data.boundary);
@@ -974,9 +986,27 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
                 client->buffer[pos++] = '=';
                 uint16_t pos1 = (ptr1-client->buffer);
                 uint16_t newlen = client->ptr-((pos1+4)-pos);
-                memmove(&client->buffer[pos], &client->buffer[pos1+4], newlen);
+                /*
+                 * The memmove must only copy the bytes that are actually
+                 * still valid past pos1+4 (client->ptr-(pos1+4)), NOT
+                 * newlen: newlen is the FINAL ptr value, which already
+                 * accounts for the retained "name=" marker staying at
+                 * buffer position 0..pos-1. Using newlen as the copy length
+                 * here reads past the end of the valid buffered content
+                 * into stale memory.
+                 */
+                memmove(&client->buffer[pos], &client->buffer[pos1+4], client->ptr-(pos1+4));
                 client->ptr = newlen;
-                client->readlen += (pos1+4);
+                /*
+                 * Only credit the actual header bytes consumed
+                 * ((pos1+4)-pos), not the full (pos1+4): the retained
+                 * "name=" marker (0..pos-1) stays physically in the buffer
+                 * for case 7/8 to use later, so it must NOT also be counted
+                 * as "consumed" here - doing so double-counts those bytes
+                 * (once via readlen here, again via ptr since they're still
+                 * buffered).
+                 */
+                client->readlen += ((pos1+4)-pos);
                 client->substep = 7;  // skip case 5 entirely, go straight to data
             } else {
                 // Single \r\n - if more headers follow, go to case 5
@@ -989,9 +1019,11 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
                         client->buffer[pos++] = '=';
                         uint16_t pos1 = (ptr1-client->buffer);
                         uint16_t newlen = client->ptr-((pos1+2)-pos);
-                        memmove(&client->buffer[pos], &client->buffer[pos1+2], newlen);
+                        // See the double-CRLF branch above for why the
+                        // memmove length and readlen credit both exclude pos.
+                        memmove(&client->buffer[pos], &client->buffer[pos1+2], client->ptr-(pos1+2));
                         client->ptr = newlen;
-                       client->readlen += (pos1+2);
+                       client->readlen += ((pos1+2)-pos);
                         client->substep = 5;
                     }
                   } else {
@@ -1052,9 +1084,11 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
                   if(ptr2 != NULL) {
                     uint16_t pos1 = (ptr2-client->buffer)+4;
 
+                    // See the case 4 double-CRLF branch for why pos is
+                    // excluded from the readlen credit here too.
                     memmove(&client->buffer[pos], &client->buffer[pos1], client->ptr-pos1);
                     client->ptr -= (pos1-pos);
-                    client->readlen += pos1;
+                    client->readlen += (pos1-pos);
                     client->substep = 7;
                   } else {
                     loop = 0;
@@ -2304,6 +2338,20 @@ void webserver_loop(void) {
   uint8_t i = 0;
 
   for(i=0;i<WEBSERVER_MAX_CLIENTS;i++) {
+    /*
+     * size (and the shared rbuffer it indexes into) must be reset for every
+     * client, not just once per call: if a client at an earlier index reads
+     * real data this pass and sets size > 0, and a later client in this same
+     * pass is connected() but not yet available() (the common case for a
+     * mostly-idle websocket), the read below is skipped and size/rbuffer
+     * would otherwise still hold the EARLIER client's leftover bytes - which
+     * then get fed into webserver_sync_receive() below as if they were
+     * freshly received data for this client. In the reverse ordering, this
+     * silently injects a few stray bytes from another connection (e.g. a
+     * websocket ping/pong) into an in-progress firmware upload's multipart
+     * stream, corrupting the byte count against the declared Content-Length.
+     */
+    size = 0;
     if(clients[i].data.step == 0 || clients[i].data.async == 1) {
       continue;
     }
