@@ -780,7 +780,9 @@ int8_t http_parse_request(struct webserver_t *client, uint8_t **buf, uint16_t *l
                   g_ending_bytes_total = 0;
                   g_ending_nonzero_count = 0;
                   g_case8_split_count = 0;
-                  g_total_bytes_fed = 0;
+                  // NOTE: g_total_bytes_fed is (re)initialized later, at the
+                  // client->readlen=0 reset (end of headers), not here -
+                  // more headers may still follow this one.
                   if((client->data.boundary = strdup(tmp)) == NULL) {
 #if defined(ESP8266) || defined(ESP32)
                     loggingSerial.printf("Out of memory %s:#%d\n", __FUNCTION__, __LINE__);
@@ -827,6 +829,11 @@ int8_t http_parse_request(struct webserver_t *client, uint8_t **buf, uint16_t *l
         memmove(&client->buffer[0], &client->buffer[2], client->ptr-2);
         client->ptr -= 2;
         client->readlen = 0;
+        // headers fully consumed here; whatever's left in the buffer (client->ptr)
+        // is body bytes already fed in but not yet seen by http_parse_multipart_body's
+        // own entry logging, so seed the running total with it for an apples-to-apples check
+        g_total_bytes_fed = client->ptr;
+        loggingSerial.printf(PSTR("[mp-dbg] end of headers: leftover_ptr=%u (seeding total_bytes_fed)\n"), (unsigned)client->ptr);
         if(client->ptr == 0 && *len > 0) {
           client->substep = 5;
           continue;
