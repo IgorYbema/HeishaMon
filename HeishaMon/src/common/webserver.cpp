@@ -1064,7 +1064,7 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
                 uint16_t newlen = client->ptr-((pos1+4)-pos);
                 loggingSerial.printf(PSTR("[mp-dbg] case4 double-CRLF-shortcut: pos(post-inc)=%u pos1(dblCRLF)=%u ptr_before=%u newlen=%u readlen_before=%u readlen_delta=%u\n"),
                   (unsigned)pos, (unsigned)pos1, (unsigned)client->ptr, (unsigned)newlen, (unsigned)client->readlen, (unsigned)(pos1+4));
-                memmove(&client->buffer[pos], &client->buffer[pos1+4], newlen);
+                memmove(&client->buffer[pos], &client->buffer[pos1+4], client->ptr-(pos1+4));
                 client->ptr = newlen;
                 client->readlen += (pos1+4);
                 client->substep = 7;  // skip case 5 entirely, go straight to data
@@ -1081,7 +1081,7 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
                         uint16_t newlen = client->ptr-((pos1+2)-pos);
                         loggingSerial.printf(PSTR("[mp-dbg] case4 single-CRLF: pos(post-inc)=%u pos1(crlf)=%u ptr_before=%u newlen=%u readlen_before=%u readlen_delta=%u\n"),
                           (unsigned)pos, (unsigned)pos1, (unsigned)client->ptr, (unsigned)newlen, (unsigned)client->readlen, (unsigned)(pos1+2));
-                        memmove(&client->buffer[pos], &client->buffer[pos1+2], newlen);
+                        memmove(&client->buffer[pos], &client->buffer[pos1+2], client->ptr-(pos1+2));
                         client->ptr = newlen;
                        client->readlen += (pos1+2);
                         client->substep = 5;
@@ -1107,7 +1107,7 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
                 uint16_t newlen = client->ptr-(pos1-pos);
                 loggingSerial.printf(PSTR("[mp-dbg] case5 content-type: pos=%u pos1(dblCRLF+4)=%u ptr_before=%u newlen=%u readlen_before=%u readlen_delta=%u\n"),
                   (unsigned)pos, (unsigned)pos1, (unsigned)client->ptr, (unsigned)newlen, (unsigned)client->readlen, (unsigned)(pos1-pos));
-                memmove(&client->buffer[pos], &client->buffer[pos1], newlen);
+                memmove(&client->buffer[pos], &client->buffer[pos1], client->ptr-pos1);
                 client->ptr = newlen;
                 client->readlen += (pos1-pos);
                 client->substep = 7;
