@@ -1142,10 +1142,17 @@ int http_parse_multipart_body(struct webserver_t *client, unsigned char *buf, ui
 				}
 			}
 
-			client->buffer[vlen] = '=';
-			memmove(&client->buffer[vlen+1], &client->buffer[pos], client->ptr-pos);
+			/*
+			 * Discard the field's "name=" marker from the front of
+			 * the buffer instead of preserving it: leaving it in
+			 * place made a later boundary check (case 0) pick this
+			 * stale marker back up via its own memchr('=') scan and
+			 * wrongly subtract its length from readlen, corrupting
+			 * the final readlen/totallen comparison.
+			 */
+			memmove(&client->buffer[0], &client->buffer[pos], client->ptr-pos);
 			client->readlen += (pos-(vlen+1));
-			client->ptr -= (pos-(vlen+1));
+			client->ptr -= pos;
             client->substep = 0;
 		  } else if(client->ptr == WEBSERVER_BUFFER_SIZE) {
             uint8_t ending = 0;
