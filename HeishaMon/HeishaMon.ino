@@ -124,6 +124,11 @@ char mqtt_topic[256];
 
 static int mqttReconnects = 0;
 
+// state for restoring known 1wire sensors from mqtt retained messages just after boot
+bool dallasMqttRestorePending = false;
+unsigned long dallasMqttRestoreStart = 0;
+#define DALLAS_MQTT_RESTORE_TIMEOUT 3000
+
 // can't have too much in buffer due to memory shortage
 #define MAXCOMMANDSINBUFFER 10
 
@@ -494,6 +499,12 @@ void mqtt_reconnect()
         mqtt_client.subscribe(mqtt_topic);
         sprintf_P(mqtt_topic, PSTR("%s/%s/WatthourTotal/2"), heishamonSettings.mqtt_topic_base, mqtt_topic_s0);
         mqtt_client.subscribe(mqtt_topic);
+      }
+      if (heishamonSettings.use_1wire && mqttReconnects == 1) { // only on first connect: retrieve previously known 1wire sensors from their retained mqtt topics
+        sprintf_P(mqtt_topic, PSTR("%s/%s/+"), heishamonSettings.mqtt_topic_base, mqtt_topic_1wire);
+        mqtt_client.subscribe(mqtt_topic);
+        dallasMqttRestorePending = true;
+        dallasMqttRestoreStart = millis();
       }
       if (mqttReconnects == 1) { //only resend all data on first connect to mqtt so a data bomb like and bad mqtt server will not cause a reconnect bomb everytime
         if (heishamonSettings.use_1wire) resetlastalldatatime_dallas(); //resend all 1wire values to mqtt
@@ -998,8 +1009,13 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
     } else if (strncmp(topic_command, mqtt_topic_gpio, strlen(mqtt_topic_gpio)) == 0)  {
       char* topic_gpiocommand = topic_command + strlen(mqtt_topic_gpio) + 1; //strip the gpio subtopic from the topic
       mqttGPIOCallback(topic_gpiocommand, msg);
-    } 
-    free(topiccopy);  
+    } else if (strncmp(topic_command, mqtt_topic_1wire, strlen(mqtt_topic_1wire)) == 0) { //this is a 1wire address topic, restore its retained value at boot
+      char* topic_1wire_address = topic_command + strlen(mqtt_topic_1wire) + 1; //strip the "1wire/" from the topic to get the sensor address
+      if ((strchr(topic_1wire_address, '/') == NULL) && (length > 0)) { //only handle the address topic itself (not .../alias) and skip empty (cleared) retained messages
+        restoreDallasFromMqtt(topic_1wire_address, String(msg).toFloat(), log_message);
+      }
+    }
+    free(topiccopy);
     mqttcallbackinprogress = false;
   }
 }
@@ -1053,6 +1069,8 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
           client->route = 50;
         } else if (strcmp((char *)dat, "/dallasalias") == 0) {
           client->route = 60;
+        } else if (strcmp((char *)dat, "/removedallas") == 0) {
+          client->route = 190;
         } else if (strcmp((char *)dat, "/togglelog") == 0) {
           client->route = 1;
           log_message(_F("Toggled mqtt log flag"));
@@ -1149,6 +1167,10 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
               sprintf_P(log_msg, PSTR("Dallas alias changed address %s to alias %s"), args->name, args->value);
               log_message(log_msg);
               changeDallasAlias((char *)args->name, (char *)args->value);
+              return 0;
+            } break;
+          case 190: {
+              removeDallasSensor(mqtt_client, heishamonSettings.mqtt_topic_base, (char *)args->name, log_message);
               return 0;
             } break;
           case 100: {
@@ -1292,6 +1314,9 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
           case 60: {
               return 0;
             } break;
+          case 190: {
+              return 0;
+            } break;
           case 80: {
               if (client->content == 0) {
                 webserver_send(client, 302, (char *)"text/html", 0);
@@ -1420,8 +1445,8 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
 
             } break;
           case 180: {
-              if (heishamonSettings.use_1wire) initDallasSensors(log_message, heishamonSettings.updataAllDallasTime, heishamonSettings.waitDallasTime, heishamonSettings.dallasResolution);
-            } break;            
+              if (heishamonSettings.use_1wire) rescanDallasSensors(log_message, heishamonSettings.dallasResolution);
+            } break;
           default: {
               webserver_send(client, 301, (char *)"text/plain", 0);
             } break;
@@ -1436,7 +1461,8 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
               return -1;
             } break;
           case 60:
-          case 70: {
+          case 70:
+          case 190: {
               header->ptr += sprintf_P((char *)header->buffer, PSTR("Location: /"));
               return -1;
             } break;
@@ -1998,6 +2024,13 @@ void loop() {
 #endif
 
   if (heishamonSettings.use_1wire) dallasLoop(mqtt_client, log_message, heishamonSettings.mqtt_topic_base);
+
+  if (dallasMqttRestorePending && ((unsigned long)(millis() - dallasMqttRestoreStart) > DALLAS_MQTT_RESTORE_TIMEOUT)) {
+    sprintf_P(mqtt_topic, PSTR("%s/%s/+"), heishamonSettings.mqtt_topic_base, mqtt_topic_1wire);
+    mqtt_client.unsubscribe(mqtt_topic);
+    dallasMqttRestorePending = false;
+    log_message(_F("Done restoring 1wire sensors from mqtt"));
+  }
 
   if (heishamonSettings.use_s0) s0Loop(mqtt_client, log_message, heishamonSettings.mqtt_topic_base, heishamonSettings.s0Settings);
 
