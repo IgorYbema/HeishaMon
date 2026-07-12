@@ -1241,6 +1241,7 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
                   }
                 } else if (strcmp((char *)args->name, "firmware") == 0) {
                   if (Update.write((uint8_t *)args->value, args->len) != args->len) {
+                    log_message(_F("Failed in writing firmware update to flash!"));
                     Update.printError(loggingSerial);
                     Update.end(false);
                   } else {
@@ -1401,13 +1402,13 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
               return showFirmware(client);
             } break;
           case 150: {
-              log_message((char*)"In /firmware client write part");
               if (Update.isRunning()) {
                 if (Update.end(true)) {
                   log_message((char*)"Firmware update success");
                   timerqueue_insert(2, 0, -2); // Start reboot sequence
                   return showFirmwareSuccess(client);
                 } else {
+                  log_message((char*)"Firmware update failed to finish.");
                   Update.printError(loggingSerial);
                   return showFirmwareFail(client);
                 }
