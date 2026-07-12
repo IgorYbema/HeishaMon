@@ -870,13 +870,17 @@ function startWebsockets(){
             updCell(j.data.heishavalues.topic+'-Value',j.data.heishavalues.value);
             updCell(j.data.heishavalues.topic+'-Description',j.data.heishavalues.description);
           } else if(j.data.dallasvalues){
-            updCell('SensorID-'+j.data.dallasvalues.sensorID+'-Temperature',j.data.dallasvalues.value);
+            var dID=j.data.dallasvalues.sensorID;
+            if(j.data.dallasvalues.value!==undefined)updCell('SensorID-'+dID+'-Temperature',j.data.dallasvalues.value);
+            if(j.data.dallasvalues.present!==undefined)updDallasPresence(dID,j.data.dallasvalues.present);
           } else if(j.data.s0values){
             updCell('s0port-'+j.data.s0values.s0port+'-Watt',j.data.s0values.Watt);
             updCell('s0port-'+j.data.s0values.s0port+'-Watthour',j.data.s0values.Watthour);
             updCell('s0port-'+j.data.s0values.s0port+'-WatthourTotal',j.data.s0values.WatthourTotal);
           } else if(j.data.opentherm){
             updCell(j.data.opentherm.name+'-value',j.data.opentherm.value);
+          } else if(j.data.dallasRescan){
+            refreshDallasTable();
           }
         }
       } else {
@@ -950,6 +954,15 @@ function updCell(id,val){
     el.classList.add('update-effect');
   }
 }
+
+function updDallasPresence(sID,present){
+  var statusCell=document.getElementById('SensorID-'+sID+'-Status');
+  if(!statusCell)return;
+  statusCell.textContent=present?'OK':'Not responding';
+  statusCell.style.color=present?'':'var(--danger,#f44336)';
+  var row=statusCell.parentElement;
+  if(row)row.style.opacity=present?'':'0.6';
+}
 </script>
 )====";
 
@@ -1000,6 +1013,52 @@ function removeDallas(addr){
   xhr.onload=function(){refreshTable();};
   xhr.send();
 }
+function renderDallasTable(d){
+  if(!(d&&d['1wire']&&Array.isArray(d['1wire'])))return;
+  var tb=document.getElementById('dallasvalues');tb.innerHTML='';
+  d['1wire'].forEach(function(item){
+    var row=document.createElement('tr');
+    var sID=item['Sensor'];
+    if(!item.Present)row.style.opacity='0.6';
+    ['Sensor','Temperature','Alias'].forEach(function(k){
+      var cell=document.createElement('td');
+      cell.id='SensorID-'+sID+'-'+k;
+      if(k==='Alias'){
+        var div=document.createElement('div');
+        div.textContent=item[k];
+        div.classList.add('alias-edit');
+        div.contentEditable='true';
+        div.setAttribute('data-address',item.Sensor);
+        div.addEventListener('focus',function(){isEditing=true;});
+        div.addEventListener('blur',dallasAliasEdit);
+        cell.appendChild(div);
+      } else {cell.textContent=item[k];}
+      row.appendChild(cell);
+    });
+    var statusCell=document.createElement('td');
+    statusCell.id='SensorID-'+sID+'-Status';
+    statusCell.textContent=item.Present?'OK':'Not responding';
+    if(!item.Present)statusCell.style.color='var(--danger,#f44336)';
+    row.appendChild(statusCell);
+    var actionCell=document.createElement('td');
+    var removeBtn=document.createElement('button');
+    removeBtn.textContent='Remove';
+    removeBtn.className='btn btn-ghost';
+    removeBtn.style.cssText='padding:2px 8px;font-size:11px;height:22px;';
+    removeBtn.onclick=function(){removeDallas(sID);};
+    actionCell.appendChild(removeBtn);
+    row.appendChild(actionCell);
+    tb.appendChild(row);
+  });
+}
+async function refreshDallasTable(){
+  try{
+    if(isEditing)return;
+    var res=await fetch('/json');
+    var d=await res.json();
+    renderDallasTable(d);
+  }catch(e){}
+}
 async function refreshTable(){
   try{
     if(isEditing)return;
@@ -1017,43 +1076,7 @@ async function refreshTable(){
       var tb=document.getElementById('heishavalues');
       d['heatpump optional'].forEach(function(item){tb.appendChild(buildRow(item,'Topic'));});
     }
-    if(d&&d['1wire']&&Array.isArray(d['1wire'])){
-      var tb=document.getElementById('dallasvalues');tb.innerHTML='';
-      d['1wire'].forEach(function(item){
-        var row=document.createElement('tr');
-        var sID=item['Sensor'];
-        if(!item.Present)row.style.opacity='0.6';
-        ['Sensor','Temperature','Alias'].forEach(function(k){
-          var cell=document.createElement('td');
-          cell.id='SensorID-'+sID+'-'+k;
-          if(k==='Alias'){
-            var div=document.createElement('div');
-            div.textContent=item[k];
-            div.classList.add('alias-edit');
-            div.contentEditable='true';
-            div.setAttribute('data-address',item.Sensor);
-            div.addEventListener('focus',function(){isEditing=true;});
-            div.addEventListener('blur',dallasAliasEdit);
-            cell.appendChild(div);
-          } else {cell.textContent=item[k];}
-          row.appendChild(cell);
-        });
-        var statusCell=document.createElement('td');
-        statusCell.id='SensorID-'+sID+'-Status';
-        statusCell.textContent=item.Present?'OK':'Not responding';
-        if(!item.Present)statusCell.style.color='var(--danger,#f44336)';
-        row.appendChild(statusCell);
-        var actionCell=document.createElement('td');
-        var removeBtn=document.createElement('button');
-        removeBtn.textContent='Remove';
-        removeBtn.className='btn btn-ghost';
-        removeBtn.style.cssText='padding:2px 8px;font-size:11px;height:22px;';
-        removeBtn.onclick=function(){removeDallas(sID);};
-        actionCell.appendChild(removeBtn);
-        row.appendChild(actionCell);
-        tb.appendChild(row);
-      });
-    }
+    renderDallasTable(d);
     if(d&&d.s0&&Array.isArray(d.s0)){
       var tb=document.getElementById('s0values');tb.innerHTML='';
       d.s0.forEach(function(item){
