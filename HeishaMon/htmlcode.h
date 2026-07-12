@@ -962,7 +962,34 @@ function updDallasPresence(sID,present){
   statusCell.style.color=present?'':'var(--danger,#f44336)';
   var row=statusCell.parentElement;
   if(row)row.style.opacity=present?'':'0.6';
+  var lastSeenCell=document.getElementById('SensorID-'+sID+'-LastSeen');
+  if(lastSeenCell){
+    if(present){
+      delete lastSeenCell.dataset.offlineSince;
+      lastSeenCell.textContent='';
+    } else {
+      lastSeenCell.dataset.offlineSince=Date.now();
+      lastSeenCell.textContent=formatOfflineDuration(false,0);
+    }
+  }
 }
+
+function formatOfflineDuration(present,lastSeenSeconds){
+  if(present)return'';
+  if(lastSeenSeconds==null||lastSeenSeconds<0)return'Never seen';
+  var s=lastSeenSeconds;
+  if(s<60)return s+'s ago';
+  if(s<3600)return Math.floor(s/60)+'m ago';
+  if(s<86400)return Math.floor(s/3600)+'h ago';
+  return Math.floor(s/86400)+'d ago';
+}
+
+setInterval(function(){
+  document.querySelectorAll('.offline-duration[data-offline-since]').forEach(function(cell){
+    var seconds=Math.floor((Date.now()-cell.dataset.offlineSince)/1000);
+    cell.textContent=formatOfflineDuration(false,seconds);
+  });
+},15000);
 </script>
 )====";
 
@@ -1040,6 +1067,12 @@ function renderDallasTable(d){
     statusCell.textContent=item.Present?'OK':'Not responding';
     if(!item.Present)statusCell.style.color='var(--danger,#f44336)';
     row.appendChild(statusCell);
+    var lastSeenCell=document.createElement('td');
+    lastSeenCell.id='SensorID-'+sID+'-LastSeen';
+    lastSeenCell.classList.add('offline-duration');
+    if(!item.Present&&item.LastSeenSeconds>=0)lastSeenCell.dataset.offlineSince=Date.now()-item.LastSeenSeconds*1000;
+    lastSeenCell.textContent=formatOfflineDuration(item.Present,item.LastSeenSeconds);
+    row.appendChild(lastSeenCell);
     var actionCell=document.createElement('td');
     var removeBtn=document.createElement('button');
     removeBtn.textContent='Remove';
@@ -1280,9 +1313,9 @@ static const char webBodyRootDallasValues[] FLASHPROG = R"====(
 <div class='panel'>
   <div class='panel-header'><h3>Dallas 1-Wire Sensors</h3><button onclick='rescanDallas()' class='btn btn-ghost' style='padding:4px 10px;font-size:11px;height:24px;'>&#8635; Rescan bus</button></div>
   <table><thead><tr>
-    <th>Sensor</th><th>Temperature</th><th>Alias</th><th>Status</th><th></th>
+    <th>Sensor</th><th>Temperature</th><th>Alias</th><th>Status</th><th>Last Seen</th><th></th>
   </tr></thead><tbody id='dallasvalues'>
-    <tr><td colspan='5' style='color:var(--text-muted);padding:24px;text-align:center'>Loading…</td></tr>
+    <tr><td colspan='6' style='color:var(--text-muted);padding:24px;text-align:center'>Loading…</td></tr>
   </tbody></table>
 </div></div>
 )====";
