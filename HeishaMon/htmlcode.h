@@ -987,6 +987,19 @@ var dallasAliasEdit=function(){
   xhr.open('GET','/dallasalias?'+addr+'='+alias,true);
   xhr.send();
 };
+function rescanDallas(){
+  var xhr=new XMLHttpRequest();
+  xhr.open('GET','/scandallas',true);
+  xhr.onload=function(){refreshTable();};
+  xhr.send();
+}
+function removeDallas(addr){
+  if(!confirm('Remove sensor '+addr+'? This also clears its retained mqtt value.'))return;
+  var xhr=new XMLHttpRequest();
+  xhr.open('GET','/removedallas?'+addr+'=1',true);
+  xhr.onload=function(){refreshTable();};
+  xhr.send();
+}
 async function refreshTable(){
   try{
     if(isEditing)return;
@@ -1009,7 +1022,8 @@ async function refreshTable(){
       d['1wire'].forEach(function(item){
         var row=document.createElement('tr');
         var sID=item['Sensor'];
-        for(var k in item){if(Object.hasOwn(item,k)){
+        if(!item.Present)row.style.opacity='0.6';
+        ['Sensor','Temperature','Alias'].forEach(function(k){
           var cell=document.createElement('td');
           cell.id='SensorID-'+sID+'-'+k;
           if(k==='Alias'){
@@ -1023,7 +1037,20 @@ async function refreshTable(){
             cell.appendChild(div);
           } else {cell.textContent=item[k];}
           row.appendChild(cell);
-        }}
+        });
+        var statusCell=document.createElement('td');
+        statusCell.id='SensorID-'+sID+'-Status';
+        statusCell.textContent=item.Present?'OK':'Not responding';
+        if(!item.Present)statusCell.style.color='var(--danger,#f44336)';
+        row.appendChild(statusCell);
+        var actionCell=document.createElement('td');
+        var removeBtn=document.createElement('button');
+        removeBtn.textContent='Remove';
+        removeBtn.className='btn btn-ghost';
+        removeBtn.style.cssText='padding:2px 8px;font-size:11px;height:22px;';
+        removeBtn.onclick=function(){removeDallas(sID);};
+        actionCell.appendChild(removeBtn);
+        row.appendChild(actionCell);
         tb.appendChild(row);
       });
     }
@@ -1228,11 +1255,11 @@ static const char webBodyRootHeatpumpValues[] FLASHPROG = R"====(
 static const char webBodyRootDallasValues[] FLASHPROG = R"====(
 <div id='Dallas' class='tab-pane'>
 <div class='panel'>
-  <div class='panel-header'><h3>Dallas 1-Wire Sensors</h3><span class='panel-meta'>Live</span></div>
+  <div class='panel-header'><h3>Dallas 1-Wire Sensors</h3><button onclick='rescanDallas()' class='btn btn-ghost' style='padding:4px 10px;font-size:11px;height:24px;'>&#8635; Rescan bus</button></div>
   <table><thead><tr>
-    <th>Sensor</th><th>Temperature</th><th>Alias</th>
+    <th>Sensor</th><th>Temperature</th><th>Alias</th><th>Status</th><th></th>
   </tr></thead><tbody id='dallasvalues'>
-    <tr><td colspan='3' style='color:var(--text-muted);padding:24px;text-align:center'>Loading…</td></tr>
+    <tr><td colspan='5' style='color:var(--text-muted);padding:24px;text-align:center'>Loading…</td></tr>
   </tbody></table>
 </div></div>
 )====";
