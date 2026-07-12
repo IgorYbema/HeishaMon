@@ -151,7 +151,10 @@ void readNewDallasTemp(PubSubClient &mqtt_client, void (*log_message)(char*), ch
         websocket_write_all(log_msg, strlen(log_msg));
       }
       float allowedtempdiff = (((millis() - actDallasData[i].lastgoodtime)) / 1000.0) * MAXTEMPDIFFPERSEC;
-      if ((actDallasData[i].temperature != -127.0) and ((temp > (actDallasData[i].temperature + allowedtempdiff)) or (temp < (actDallasData[i].temperature - allowedtempdiff)))) {
+      if (fabs(temp - 85.0) < 0.0001) { // 85.0C is the DS18B20 power-on reset default, not a real reading; sensor is online, just not converted yet
+        sprintf_P(log_msg, PSTR("Ignoring 1wire sensor power-on-reset value (85.00): %s"), actDallasData[i].address);
+        log_message(log_msg);
+      } else if ((actDallasData[i].temperature != -127.0) and ((temp > (actDallasData[i].temperature + allowedtempdiff)) or (temp < (actDallasData[i].temperature - allowedtempdiff)))) {
         sprintf_P(log_msg, PSTR("Filtering 1wire sensor temperature (%s). Delta to high. Current: %.2f Last: %.2f"), actDallasData[i].address, temp, actDallasData[i].temperature);
         log_message(log_msg);
       } else {
