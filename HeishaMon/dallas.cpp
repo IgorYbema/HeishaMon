@@ -220,7 +220,7 @@ void dallasJsonOutput(struct webserver_t *client) {
     } else {
       webserver_send_content_P(client, PSTR("false"), 5);
     }
-    webserver_send_content_P(client, PSTR(",\"LastSeenSeconds\":"), 20);
+    webserver_send_content_P(client, PSTR(",\"LastSeenSeconds\":"), 19);
     long lastSeenSeconds = (actDallasData[i].lastgoodtime == 0) ? -1 : (long)((millis() - actDallasData[i].lastgoodtime) / 1000);
     sprintf(str, "%ld", lastSeenSeconds);
     webserver_send_content(client, str, strlen(str));
