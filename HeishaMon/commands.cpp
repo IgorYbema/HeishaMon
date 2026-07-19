@@ -290,6 +290,29 @@ unsigned int set_force_DHW(char *msg, unsigned char *cmd, char *log_msg) {
   return sizeof(panasonicSendQuery);
 }
 
+unsigned int set_force_heater(char *msg, unsigned char *cmd, char *log_msg) {
+
+  String set_force_heater_string(msg);
+
+  byte force_heater_mode = 4; //hex 0x04, byte5 bit5and6 field = 01 (off)
+  if ( set_force_heater_string.toInt() == 1 ) {
+    force_heater_mode = 8; //hex 0x08, byte5 bit5and6 field = 10 (on)
+  }
+
+  {
+    char tmp[256] = { 0 };
+    snprintf_P(tmp, 255, PSTR("set force heater mode to %d"), (force_heater_mode / 4) - 1);
+    memcpy(log_msg, tmp, sizeof(tmp));
+  }
+
+  {
+    memcpy_P(cmd, panasonicSendQuery, sizeof(panasonicSendQuery));
+    cmd[5] = force_heater_mode;
+  }
+
+  return sizeof(panasonicSendQuery);
+}
+
 unsigned int set_force_defrost(char *msg, unsigned char *cmd, char *log_msg) {
 
   String set_force_defrost_string(msg);

@@ -38,6 +38,7 @@ unsigned int set_z1_cool_request_temperature(char *msg, unsigned char *cmd, char
 unsigned int set_z2_heat_request_temperature(char *msg, unsigned char *cmd, char *log_msg);
 unsigned int set_z2_cool_request_temperature(char *msg, unsigned char *cmd, char *log_msg);
 unsigned int set_force_DHW(char *msg, unsigned char *cmd, char *log_msg);
+unsigned int set_force_heater(char *msg, unsigned char *cmd, char *log_msg);
 unsigned int set_force_defrost(char *msg, unsigned char *cmd, char *log_msg);
 unsigned int set_force_sterilization(char *msg, unsigned char *cmd, char *log_msg);
 unsigned int set_holiday_mode(char *msg, unsigned char *cmd, char *log_msg);
@@ -117,6 +118,8 @@ const cmdStruct commands[] PROGMEM = {
   { "SetZ2CoolRequestTemperature", set_z2_cool_request_temperature },
   // set mode to force DHW by sending 1
   { "SetForceDHW", set_force_DHW },
+  // set mode to force heater by sending 1
+  { "SetForceHeater", set_force_heater },
   // set mode to force defrost  by sending 1
   { "SetForceDefrost", set_force_defrost },
   // set mode to force sterilization by sending 1

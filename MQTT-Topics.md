@@ -235,6 +235,7 @@ SET43 | SetDHWSensorSelection | Set DHW tank sensor selection (K/L series All-In
 SET44 | SetDHWHeaterState | Allow DHW backup/booster heater | 0=blocked, 1=free
 SET45 | SetRoomHeaterState | Allow Room backup/booster heater | 0=blocked, 1=free
 SET46 | SetHeaterOnOutdoorTemp | Outdoor temperature for heater ON | -15 to 20
+SET47 | SetForceHeater | Forces the backup/booster heater | 0, 1
 
 
 *If you operate your heatpump in water mode with direct temperature setup: topics ending xxxRequestTemperature will set the absolute target temperature.*
