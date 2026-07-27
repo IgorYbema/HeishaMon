@@ -70,6 +70,14 @@ Assuming that bytes from #129 to #138 are unique for each model of Aquarea heat 
 |63 | C2 D3 0D 35 65 B2 D3 0B 96 65 | Monoblock | WH-MDC09J3E5-1 | Monoblock | 9 | 1ph | HP |
 |64 | E2 D5 0C 29 99 83 92 0C 29 98 | WH-ADC0509L3E5 | WH-WDG09LE5 | KIT-ADC09L3E5 | 9 | 1ph | HP - All-In-One L-series |
 |65 | 62 D2 0B 45 54 42 D2 0B 72 66 | WH-ADC0309J3E5 | WH-UD09JE5-1 | KIT-ADC09JE5 | 9 | 1ph | HP - All-In-One J-series |
+|66 | E2 CF 0B 82 09 12 D0 0B 10 11 | WH-SDC12H6E5 | WH-UD12HE5 | KIT-WC012H6E5 | 12 | 1ph | HP |
+|67 | 42 D4 0B 83 71 32 D2 0C 45 55 | WH-ADC0309J3E5C | WH-UD05JE5 | KIT-ADC05JE5C | 5 | 1ph | HP - All-In-One J-series |
+|68 | 12 D7 0B 47 19 37 94 0E 83 10 | WH-ADC0316M9E83 | WH-WXG09ME8 | Monoblock | 9 | 3ph | T-CAP - M-series DHW 260l |
+|69 | E2 D5 0D 00 09 43 D6 0E 07 09 | WH-SDC09K3E8 | WH-UDZ09KE8 | KIT-WC09K3E8 | 9 | 3ph | HP |
+|70 | E2 CF 0B 84 05 12 D0 0B 93 05 | WH-SQC16H9E8 | WH-UQ16HE8 | KIT-WQC16H9E8 | 16 | 3ph | T-CAP - Bi-bloc H Serie |
+|71 | E2 D5 0B 35 99 83 92 0D 29 98 | WH-SDC0509L6E5 | WH-WDG09LE5 | KIT-WC09L6E5 | 9 | 1 ph | HP - split L-series 6kW elec heating |
+|72 | 12 D7 0B 98 14 35 94 0D 83 10 | WH-SDC0316M9E8 | WH-WXG09ME8 | Monoblock | 9 | 3ph | T-CAP - M-series  |
+|73 | E2 CF 0C 77 09 12 D0 0B 05 11 | WH-SXC09H3E5 | WH-UX09HE5 | KIT-WXC09H3E5 | 9 | 1ph | T-CAP |
 
 All bytes are used for Heat Pump model identification in the code.
 

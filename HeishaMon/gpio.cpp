@@ -27,7 +27,9 @@ void setupGPIO(gpioSettingsStruct &gpioSettings) {
 }
 
 void mqttGPIOCallback(char* topic, char* value, gpioSettingsStruct &gpioSettings) {
-  log_message(_F("GPIO: MQTT message received"));
+  char log_msg[256];
+  sprintf_P(log_msg, PSTR("GPIO: MQTT message received on subtopic '%s' value '%s'"), topic, value);
+  log_message(log_msg);
 #ifdef ESP32
   if (strcmp_P(PSTR("relay/one"), topic) == 0) {
     log_message(_F("GPIO: MQTT message received 'relay/one'"));
@@ -80,3 +82,4 @@ void gpioJsonOutput(struct webserver_t *client, gpioSettingsStruct &gpioSettings
   }
   webserver_send_content_P(client, PSTR("]"), 1);
 }
+

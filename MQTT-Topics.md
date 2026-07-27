@@ -235,6 +235,8 @@ SET43 | SetDHWSensorSelection | Set DHW tank sensor selection (K/L series All-In
 SET44 | SetDHWHeaterState | Allow DHW backup/booster heater | 0=blocked, 1=free
 SET45 | SetRoomHeaterState | Allow Room backup/booster heater | 0=blocked, 1=free
 SET46 | SetHeaterOnOutdoorTemp | Outdoor temperature for heater ON | -15 to 20
+SET47 | SetForceHeater | Force heater mode (emergency heating), same as the heater button on the remote. State is reported in TOP68 | 0=off, 1=on
+SET48 | SetReset | Reset/confirm active heatpump fault code (e.g. H72). Equivalent to pressing "Reset" on the CZ-TAW1 remote / indoor unit panel. Writes byte 8 of the outgoing query. Clears latched errors that soft power-cycle (`SetHeatpump` 0→1) cannot clear. | 0=no action, 1=reset
 
 
 *If you operate your heatpump in water mode with direct temperature setup: topics ending xxxRequestTemperature will set the absolute target temperature.*

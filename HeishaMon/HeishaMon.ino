@@ -124,6 +124,11 @@ char mqtt_topic[256];
 
 static int mqttReconnects = 0;
 
+// state for restoring known 1wire sensors from mqtt retained messages just after boot
+bool dallasMqttRestorePending = false;
+unsigned long dallasMqttRestoreStart = 0;
+#define DALLAS_MQTT_RESTORE_TIMEOUT 3000
+
 // can't have too much in buffer due to memory shortage
 #define MAXCOMMANDSINBUFFER 10
 
@@ -494,6 +499,12 @@ void mqtt_reconnect()
         mqtt_client.subscribe(mqtt_topic);
         sprintf_P(mqtt_topic, PSTR("%s/%s/WatthourTotal/2"), heishamonSettings.mqtt_topic_base, mqtt_topic_s0);
         mqtt_client.subscribe(mqtt_topic);
+      }
+      if (heishamonSettings.use_1wire && mqttReconnects == 1) { // only on first connect: retrieve previously known 1wire sensors from their retained mqtt topics
+        sprintf_P(mqtt_topic, PSTR("%s/%s/+"), heishamonSettings.mqtt_topic_base, mqtt_topic_1wire);
+        mqtt_client.subscribe(mqtt_topic);
+        dallasMqttRestorePending = true;
+        dallasMqttRestoreStart = millis();
       }
       if (mqttReconnects == 1) { //only resend all data on first connect to mqtt so a data bomb like and bad mqtt server will not cause a reconnect bomb everytime
         if (heishamonSettings.use_1wire) resetlastalldatatime_dallas(); //resend all 1wire values to mqtt
@@ -950,7 +961,15 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
       msg[i] = (char)payload[i];
     }
     msg[length] = '\0';
-    char* topic_command = topic + strlen(heishamonSettings.mqtt_topic_base) + 1; //strip base plus seperator from topic
+
+    // copy topic to the heap so a later mqtt publish can't clobber PubSubClient's buffer
+    char* topiccopy = (char*) malloc(strlen(topic) + 1);
+    if (topiccopy) {
+      memcpy(topiccopy, topic, strlen(topic) + 1);
+      topic = topiccopy;	
+    }
+	  
+	char* topic_command = topic + strlen(heishamonSettings.mqtt_topic_base) + 1; //strip base plus seperator from topic
     if (strcmp(topic_command, mqtt_send_raw_value_topic) == 0)
     { // send a raw hex string
       byte *rawcommand;
@@ -991,7 +1010,13 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
     } else if (strncmp(topic_command, mqtt_topic_gpio, strlen(mqtt_topic_gpio)) == 0)  {
       char* topic_gpiocommand = topic_command + strlen(mqtt_topic_gpio) + 1; //strip the gpio subtopic from the topic
       mqttGPIOCallback(topic_gpiocommand, msg, heishamonSettings.gpioSettings);
-    }    
+    } else if (strncmp(topic_command, mqtt_topic_1wire, strlen(mqtt_topic_1wire)) == 0) { //this is a 1wire address topic, restore its retained value at boot
+      char* topic_1wire_address = topic_command + strlen(mqtt_topic_1wire) + 1; //strip the "1wire/" from the topic to get the sensor address
+      if ((strchr(topic_1wire_address, '/') == NULL) && (length > 0)) { //only handle the address topic itself (not .../alias) and skip empty (cleared) retained messages
+        restoreDallasFromMqtt(topic_1wire_address, String(msg).toFloat(), log_message);
+      }
+    }
+    free(topiccopy);
     mqttcallbackinprogress = false;
   }
 }
@@ -1045,6 +1070,8 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
           client->route = 50;
         } else if (strcmp((char *)dat, "/dallasalias") == 0) {
           client->route = 60;
+        } else if (strcmp((char *)dat, "/removedallas") == 0) {
+          client->route = 190;
         } else if (strcmp((char *)dat, "/togglelog") == 0) {
           client->route = 1;
           log_message(_F("Toggled mqtt log flag"));
@@ -1053,12 +1080,16 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
           client->route = 1;
           log_message(_F("Toggled hexdump log flag"));
           heishamonSettings.logHexdump ^= true;
-        } else if (strcmp_P((char *)dat, PSTR("/hotspot-detect.html")) == 0 ||
+        } else if (strcmp_P((char *)dat, PSTR("/connecttest.txt")) == 0 ||
+                   strcmp_P((char *)dat, PSTR("/ncsi.txt")) == 0 ||
+                   strcmp_P((char *)dat, PSTR("/redirect")) == 0 ||
                    strcmp_P((char *)dat, PSTR("/fwlink")) == 0 ||
                    strcmp_P((char *)dat, PSTR("/generate_204")) == 0 ||
                    strcmp_P((char *)dat, PSTR("/gen_204")) == 0 ||
                    strcmp_P((char *)dat, PSTR("/popup")) == 0) {
-          client->route = 80;
+          client->route = 80; //for Android/Windows devices
+        } else if (strcmp_P((char *)dat, PSTR("/hotspot-detect.html")) == 0 ) {
+          client->route = 81;  //for Apple devices
         } else if (strcmp_P((char *)dat, PSTR("/factoryreset")) == 0) {
           client->route = 90;
         } else if (strcmp_P((char *)dat, PSTR("/gpio")) == 0) {
@@ -1141,6 +1172,10 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
               changeDallasAlias((char *)args->name, (char *)args->value);
               return 0;
             } break;
+          case 190: {
+              removeDallasSensor(mqtt_client, heishamonSettings.mqtt_topic_base, (char *)args->name, log_message);
+              return 0;
+            } break;
           case 100: {
               unsigned char cmd[256] = { 0 };
               char cpy[args->len + 1];
@@ -1185,6 +1220,9 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
                     strcat((char *)client->userdata, log_msg);
                     strcat((char *)client->userdata, "\n");
                     log_message(log_msg);
+#ifdef ESP32
+                    xQueueOverwrite(pcbQueue, optionalPCBQuery);
+#endif
                   }
                 }
               }
@@ -1300,9 +1338,29 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
           case 60: {
               return 0;
             } break;
-          case 80: {
-              return handleSettings(client);
+          case 190: {
+              return 0;
             } break;
+          case 80: {
+              if (client->content == 0) {
+                webserver_send(client, 302, (char *)"text/html", 0);
+              }
+              return 0;
+            } break;
+          case 81: {
+              if (client->content == 0) {
+                static const char body[] PROGMEM =
+                  "<HTML><HEAD><TITLE>HeishaMon Setup</TITLE>"
+                  "<META name='viewport' content='width=device-width,initial-scale=1'>"
+                  "</HEAD><BODY>"
+                  "<h2>HeishaMon Setup</h2>"
+                  "<p><a href='http://192.168.4.1/settings'>Open Settings</a></p>"
+                  "</BODY></HTML>";
+                webserver_send(client, 200, (char *)"text/html", strlen(body));
+                webserver_send_content_P(client, body, strlen(body));
+              }
+              return 0;
+            } break;            
           case 90: {
               return handleFactoryReset(client);
             } break;
@@ -1412,7 +1470,7 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
 
             } break;
           case 180: {
-              if (heishamonSettings.use_1wire) initDallasSensors(log_message, heishamonSettings.updataAllDallasTime, heishamonSettings.waitDallasTime, heishamonSettings.dallasResolution);
+|             if (heishamonSettings.use_1wire) rescanDallasSensors(log_message, heishamonSettings.dallasResolution);
             } break;
           case 190: {
               if (client->content == 0) {
@@ -1438,10 +1496,16 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
               return -1;
             } break;
           case 60:
-          case 70: {
+          case 70:
+          case 190: {
               header->ptr += sprintf_P((char *)header->buffer, PSTR("Location: /"));
               return -1;
             } break;
+          case 80: {
+              header->ptr += sprintf_P((char *)header->buffer, 
+              PSTR("Location: http://192.168.4.1/settings"));
+              return -1;
+            } break;            
           case 170: {
               header->ptr += sprintf_P((char *)header->buffer, PSTR("Location: /rules"));
               return -1;
@@ -1834,9 +1898,13 @@ void setup() {
   setupHttp();
 
   loggingSerial.println(F("Setup SNTP..."));
+#if defined(ESP8266)
   sntp_stop();
   sntp_setoperatingmode(SNTP_OPMODE_POLL);
   sntp_init();
+#else
+  loggingSerial.println(F("SNTP setup deferred until network is up"));
+#endif
 
   loggingSerial.println(F("Setup MQTT..."));
   setupMqtt();
@@ -1995,6 +2063,13 @@ void loop() {
 #endif
 
   if (heishamonSettings.use_1wire) dallasLoop(mqtt_client, log_message, heishamonSettings.mqtt_topic_base);
+
+  if (dallasMqttRestorePending && ((unsigned long)(millis() - dallasMqttRestoreStart) > DALLAS_MQTT_RESTORE_TIMEOUT)) {
+    sprintf_P(mqtt_topic, PSTR("%s/%s/+"), heishamonSettings.mqtt_topic_base, mqtt_topic_1wire);
+    mqtt_client.unsubscribe(mqtt_topic);
+    dallasMqttRestorePending = false;
+    log_message(_F("Done restoring 1wire sensors from mqtt"));
+  }
 
   if (heishamonSettings.use_s0) s0Loop(mqtt_client, log_message, heishamonSettings.mqtt_topic_base, heishamonSettings.s0Settings);
 

@@ -640,7 +640,9 @@ static const char webHeader[] FLASHPROG = R"====(
     }
     return null;
   }
-  if(getCookie('darkMode')==='true'){
+  var darkMode=getCookie('darkMode');
+  var wantDark = darkMode==='true' || (darkMode===null && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  if(wantDark){
     document.documentElement.classList.add('dark-mode-loading');
   }
 })();
@@ -798,12 +800,21 @@ function initDarkMode() {
   var darkMode = getCookie('darkMode');
   var toggle = document.getElementById('darkModeToggle');
   var html = document.documentElement;
-  
+
   // Remove the temporary loading class
   html.classList.remove('dark-mode-loading');
-  
-  // Apply proper dark mode
+
+  // No explicit preference saved yet: follow the OS/browser setting
+  var useDark;
   if (darkMode === 'true') {
+    useDark = true;
+  } else if (darkMode === 'false') {
+    useDark = false;
+  } else {
+    useDark = !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  }
+
+  if (useDark) {
     html.classList.add('dark-mode');
     if (toggle) toggle.checked = true;
   } else {
@@ -870,13 +881,17 @@ function startWebsockets(){
             updCell(j.data.heishavalues.topic+'-Value',j.data.heishavalues.value);
             updCell(j.data.heishavalues.topic+'-Description',j.data.heishavalues.description);
           } else if(j.data.dallasvalues){
-            updCell('SensorID-'+j.data.dallasvalues.sensorID+'-Temperature',j.data.dallasvalues.value);
+            var dID=j.data.dallasvalues.sensorID;
+            if(j.data.dallasvalues.value!==undefined)updCell('SensorID-'+dID+'-Temperature',j.data.dallasvalues.value);
+            if(j.data.dallasvalues.present!==undefined)updDallasPresence(dID,j.data.dallasvalues.present);
           } else if(j.data.s0values){
             updCell('s0port-'+j.data.s0values.s0port+'-Watt',j.data.s0values.Watt);
             updCell('s0port-'+j.data.s0values.s0port+'-Watthour',j.data.s0values.Watthour);
             updCell('s0port-'+j.data.s0values.s0port+'-WatthourTotal',j.data.s0values.WatthourTotal);
           } else if(j.data.opentherm){
             updCell(j.data.opentherm.name+'-value',j.data.opentherm.value);
+          } else if(j.data.dallasRescan){
+            refreshDallasTable();
           }
         }
       } else {
@@ -950,6 +965,40 @@ function updCell(id,val){
     el.classList.add('update-effect');
   }
 }
+
+function updDallasPresence(sID,present){
+  var statusCell=document.getElementById('SensorID-'+sID+'-Status');
+  if(!statusCell)return;
+  var row=statusCell.parentElement;
+  if(row)row.style.opacity=present?'':'0.6';
+  statusCell.style.color=present?'':'var(--danger,#f44336)';
+  if(present){
+    delete statusCell.dataset.offlineSince;
+    statusCell.classList.remove('offline-duration');
+    statusCell.textContent='OK';
+  } else {
+    statusCell.dataset.offlineSince=Date.now();
+    statusCell.classList.add('offline-duration');
+    statusCell.textContent=formatOfflineDuration(false,0);
+  }
+}
+
+function formatOfflineDuration(present,lastSeenSeconds){
+  if(present)return'OK';
+  if(lastSeenSeconds==null||lastSeenSeconds<0)return'Offline (never seen)';
+  var s=lastSeenSeconds;
+  if(s<60)return'Offline for '+s+'s';
+  if(s<3600)return'Offline for '+Math.floor(s/60)+'m';
+  if(s<86400)return'Offline for '+Math.floor(s/3600)+'h';
+  return'Offline for '+Math.floor(s/86400)+'d';
+}
+
+setInterval(function(){
+  document.querySelectorAll('.offline-duration[data-offline-since]').forEach(function(cell){
+    var seconds=Math.floor((Date.now()-cell.dataset.offlineSince)/1000);
+    cell.textContent=formatOfflineDuration(false,seconds);
+  });
+},15000);
 </script>
 )====";
 
@@ -987,6 +1036,69 @@ var dallasAliasEdit=function(){
   xhr.open('GET','/dallasalias?'+addr+'='+alias,true);
   xhr.send();
 };
+function rescanDallas(){
+  var xhr=new XMLHttpRequest();
+  xhr.open('GET','/scandallas',true);
+  xhr.onload=function(){refreshTable();};
+  xhr.send();
+}
+function removeDallas(addr){
+  if(!confirm('Remove sensor '+addr+'? This also clears its retained mqtt value.'))return;
+  var xhr=new XMLHttpRequest();
+  xhr.open('GET','/removedallas?'+addr+'=1',true);
+  xhr.onload=function(){refreshTable();};
+  xhr.send();
+}
+function renderDallasTable(d){
+  if(!(d&&d['1wire']&&Array.isArray(d['1wire'])))return;
+  var tb=document.getElementById('dallasvalues');tb.innerHTML='';
+  d['1wire'].forEach(function(item){
+    var row=document.createElement('tr');
+    var sID=item['Sensor'];
+    if(!item.Present)row.style.opacity='0.6';
+    ['Sensor','Temperature','Alias'].forEach(function(k){
+      var cell=document.createElement('td');
+      cell.id='SensorID-'+sID+'-'+k;
+      if(k==='Alias'){
+        var div=document.createElement('div');
+        div.textContent=item[k];
+        div.classList.add('alias-edit');
+        div.contentEditable='true';
+        div.setAttribute('data-address',item.Sensor);
+        div.addEventListener('focus',function(){isEditing=true;});
+        div.addEventListener('blur',dallasAliasEdit);
+        cell.appendChild(div);
+      } else {cell.textContent=item[k];}
+      row.appendChild(cell);
+    });
+    var statusCell=document.createElement('td');
+    statusCell.id='SensorID-'+sID+'-Status';
+    if(!item.Present){
+      statusCell.style.color='var(--danger,#f44336)';
+      statusCell.classList.add('offline-duration');
+      if(item.LastSeenSeconds>=0)statusCell.dataset.offlineSince=Date.now()-item.LastSeenSeconds*1000;
+    }
+    statusCell.textContent=formatOfflineDuration(item.Present,item.LastSeenSeconds);
+    row.appendChild(statusCell);
+    var actionCell=document.createElement('td');
+    var removeBtn=document.createElement('button');
+    removeBtn.textContent='Remove';
+    removeBtn.className='btn btn-ghost';
+    removeBtn.style.cssText='padding:2px 8px;font-size:11px;height:22px;';
+    removeBtn.onclick=function(){removeDallas(sID);};
+    actionCell.appendChild(removeBtn);
+    row.appendChild(actionCell);
+    tb.appendChild(row);
+  });
+}
+async function refreshDallasTable(){
+  try{
+    if(isEditing)return;
+    var res=await fetch('/json');
+    var d=await res.json();
+    renderDallasTable(d);
+  }catch(e){}
+}
 async function refreshTable(){
   try{
     if(isEditing)return;
@@ -1004,29 +1116,7 @@ async function refreshTable(){
       var tb=document.getElementById('heishavalues');
       d['heatpump optional'].forEach(function(item){tb.appendChild(buildRow(item,'Topic'));});
     }
-    if(d&&d['1wire']&&Array.isArray(d['1wire'])){
-      var tb=document.getElementById('dallasvalues');tb.innerHTML='';
-      d['1wire'].forEach(function(item){
-        var row=document.createElement('tr');
-        var sID=item['Sensor'];
-        for(var k in item){if(Object.hasOwn(item,k)){
-          var cell=document.createElement('td');
-          cell.id='SensorID-'+sID+'-'+k;
-          if(k==='Alias'){
-            var div=document.createElement('div');
-            div.textContent=item[k];
-            div.classList.add('alias-edit');
-            div.contentEditable='true';
-            div.setAttribute('data-address',item.Sensor);
-            div.addEventListener('focus',function(){isEditing=true;});
-            div.addEventListener('blur',dallasAliasEdit);
-            cell.appendChild(div);
-          } else {cell.textContent=item[k];}
-          row.appendChild(cell);
-        }}
-        tb.appendChild(row);
-      });
-    }
+    renderDallasTable(d);
     if(d&&d.s0&&Array.isArray(d.s0)){
       var tb=document.getElementById('s0values');tb.innerHTML='';
       d.s0.forEach(function(item){
@@ -1070,101 +1160,47 @@ function buildRow(item,idKey){
 
 static const char consoleTogglesJS[] FLASHPROG = R"====(
 <script>
-// Session cookie helpers
-function setSessionCookie(name, value) {
-  document.cookie = name + "=" + value + "; path=/; SameSite=Strict";
-}
-
-function getSessionCookie(name) {
-  var nameEQ = name + "=";
-  var ca = document.cookie.split(';');
-  for(var i = 0; i < ca.length; i++) {
-    var c = ca[i];
-    while (c.charAt(0) == ' ') c = c.substring(1, c.length);
-    if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
-  }
-  return null;
-}
-
-// Initialize console toggles from session cookies or fetch from server
-function initConsoleToggles() {
-  var mqttLogState = getSessionCookie('mqttLog');
-  var hexdumpState = getSessionCookie('hexdump');
-  
-  if (mqttLogState !== null && hexdumpState !== null) {
-    // Use cached session state
-    document.getElementById('mqttLogToggle').checked = (mqttLogState === 'true');
-    document.getElementById('hexdumpToggle').checked = (hexdumpState === 'true');
-  } else {
-    // First visit in session - fetch from server
-    fetch('/getsettings')
-      .then(function(response) { return response.json(); })
-      .then(function(data) {
-        var mqttEnabled = (data.logMqtt === 'enabled' || data.logMqtt === 1);
-        var hexdumpEnabled = (data.logHexdump === 'enabled' || data.logHexdump === 1);
-        
-        document.getElementById('mqttLogToggle').checked = mqttEnabled;
-        document.getElementById('hexdumpToggle').checked = hexdumpEnabled;
-        
-        // Store in session cookies
-        setSessionCookie('mqttLog', mqttEnabled);
-        setSessionCookie('hexdump', hexdumpEnabled);
-      })
-      .catch(function(err) {
-        console.error('Failed to fetch settings:', err);
-      });
-  }
-}
-
-// Toggle MQTT log
-function toggleMqttLog() {
-  var toggle = document.getElementById('mqttLogToggle');
-  var enabled = toggle.checked;
-  
-  // Update session cookie
-  setSessionCookie('mqttLog', enabled);
-  
-  // Call server endpoint
-  fetch('/togglelog')
-    .then(function(response) {
-      if (!response.ok) {
-        console.error('Failed to toggle MQTT log');
-        // Revert toggle on error
-        toggle.checked = !enabled;
-        setSessionCookie('mqttLog', !enabled);
-      }
+// Refresh both console toggles from the live device state.
+// The device's runtime flags are the source of truth: they reset on reboot to
+// the "from start" settings and are flipped by /togglelog and /togglehexdump.
+// Reading /getsettings after every change keeps the switches in sync with the
+// device instead of with a (possibly stale) browser-side cache.
+function refreshConsoleToggles() {
+  return fetch('/getsettings')
+    .then(function(response) { return response.json(); })
+    .then(function(data) {
+      var mqttEnabled = (data.logMqtt === 'enabled' || data.logMqtt === 1);
+      var hexdumpEnabled = (data.logHexdump === 'enabled' || data.logHexdump === 1);
+      document.getElementById('mqttLogToggle').checked = mqttEnabled;
+      document.getElementById('hexdumpToggle').checked = hexdumpEnabled;
     })
     .catch(function(err) {
-      console.error('Error toggling MQTT log:', err);
-      // Revert toggle on error
-      toggle.checked = !enabled;
-      setSessionCookie('mqttLog', !enabled);
+      console.error('Failed to fetch settings:', err);
     });
 }
 
-// Toggle Hexdump log
+function initConsoleToggles() {
+  refreshConsoleToggles();
+}
+
+// Toggle MQTT log, then re-read the device state so the switch reflects the
+// actual resulting position (the endpoint flips the flag server-side).
+function toggleMqttLog() {
+  fetch('/togglelog')
+    .then(function() { refreshConsoleToggles(); })
+    .catch(function(err) {
+      console.error('Error toggling MQTT log:', err);
+      refreshConsoleToggles();
+    });
+}
+
+// Toggle Hexdump log, then re-read the device state (see toggleMqttLog).
 function toggleHexdump() {
-  var toggle = document.getElementById('hexdumpToggle');
-  var enabled = toggle.checked;
-  
-  // Update session cookie
-  setSessionCookie('hexdump', enabled);
-  
-  // Call server endpoint
   fetch('/togglehexdump')
-    .then(function(response) {
-      if (!response.ok) {
-        console.error('Failed to toggle hexdump');
-        // Revert toggle on error
-        toggle.checked = !enabled;
-        setSessionCookie('hexdump', !enabled);
-      }
-    })
+    .then(function() { refreshConsoleToggles(); })
     .catch(function(err) {
       console.error('Error toggling hexdump:', err);
-      // Revert toggle on error
-      toggle.checked = !enabled;
-      setSessionCookie('hexdump', !enabled);
+      refreshConsoleToggles();
     });
 }
 
@@ -1282,11 +1318,11 @@ static const char webBodyRootHeatpumpValues[] FLASHPROG = R"====(
 static const char webBodyRootDallasValues[] FLASHPROG = R"====(
 <div id='Dallas' class='tab-pane'>
 <div class='panel'>
-  <div class='panel-header'><h3>Dallas 1-Wire Sensors</h3><span class='panel-meta'>Live</span></div>
+  <div class='panel-header'><h3>Dallas 1-Wire Sensors</h3><button onclick='rescanDallas()' class='btn btn-ghost' style='padding:4px 10px;font-size:11px;height:24px;'>&#8635; Rescan bus</button></div>
   <table><thead><tr>
-    <th>Sensor</th><th>Temperature</th><th>Alias</th>
+    <th>Sensor</th><th>Temperature</th><th>Alias</th><th>Status</th><th></th>
   </tr></thead><tbody id='dallasvalues'>
-    <tr><td colspan='3' style='color:var(--text-muted);padding:24px;text-align:center'>Loading…</td></tr>
+    <tr><td colspan='5' style='color:var(--text-muted);padding:24px;text-align:center'>Loading…</td></tr>
   </tbody></table>
 </div></div>
 )====";

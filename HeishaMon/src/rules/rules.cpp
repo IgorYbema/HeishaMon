@@ -2024,6 +2024,7 @@ static void bc_assign_slots(struct rules_t *obj) {
       }
     }
     end = a;
+    start = end;
 
     for(a=end;a<getval(obj->bc.nrbytes);a = bc_next(obj, a)) {
       if(a == -1) {
@@ -2099,7 +2100,12 @@ static void bc_assign_slots(struct rules_t *obj) {
          (gettype(obj->bc.buffer[a]) == OP_PUSH && (d < 0 || d >= min))) {
         continue;
       }
-
+      if(gettype(obj->bc.buffer[a]) == OP_CALL && getval(x->a) == 0) {
+        continue;
+      }
+      if(gettype(obj->bc.buffer[a]) == OP_SETVAL) {
+        continue;
+      }
 
       int32_t e = bc_before(a);
       struct vm_top_t *z = NULL;
@@ -2195,6 +2201,9 @@ static void bc_assign_slots(struct rules_t *obj) {
         continue;
       }
       if(gettype(obj->bc.buffer[a]) == OP_CLEAR) {
+        continue;
+      }
+      if(gettype(obj->bc.buffer[a]) == OP_CALL && getval(x->a) == 0) {
         continue;
       }
       if(d >= min) {
@@ -3327,7 +3336,11 @@ static int16_t rule_create(char **text, struct rules_t *obj) {
 
         switch(type) {
           case TSEMICOLON: {
-            bc_parent(obj, OP_CLEAR, 0, 0, 0);
+            uint16_t a  = bc_parent(obj, OP_CLEAR, 0, 0, 0);
+            {
+              struct vm_top_t *node = (struct vm_top_t *)&obj->bc.buffer[bc_before(a)];
+              setval(node->a, 0);
+            }
             pos++;
 
             if(lexer_peek(text, pos, &type, &start, &len) <= 0) {
@@ -3365,6 +3378,14 @@ static int16_t rule_create(char **text, struct rules_t *obj) {
                   return -1;
                   /* LCOV_EXCL_STOP*/
                 }
+                /*
+                 * A call/expression statement closes this if-block. Reset the
+                 * temporary slot counter so a following sibling if-condition
+                 * starts fresh. Otherwise mathcnt leaks across the block and
+                 * bc_parse_math_order's backward slot search overshoots into
+                 * this block, relocating its trailing logical operator (#894).
+                 */
+                mathcnt = 0;
                 go = TEND;
                 ret = TIF;
                 continue;
@@ -4941,7 +4962,7 @@ int8_t rule_run(struct rules_t *obj, uint8_t validate) {
     uint16_t c = (int8_t)getval(node->c);
 
 #if defined(DEBUG) || defined(COVERALLS)
-    if((int8_t)getval(node->a) >= 0) {
+    if((int8_t)getval(node->a) > 0) {
       logprintf_P(F("FATAL: Internal error in %s #%d pos (%d)"), __FUNCTION__, __LINE__, pos/4);
       return -1;
     }
@@ -4966,7 +4987,7 @@ int8_t rule_run(struct rules_t *obj, uint8_t validate) {
         return -1;
         /* LCOV_EXCL_STOP*/
       }
-      if(rules_gettop() == 1) {
+      if(rules_gettop() == 1 && a != 4) {
         switch(rules_type(-1)) {
           case VNULL: {
             struct vm_vnull_t *upd = (struct vm_vnull_t *)&obj->heap->buffer[a];

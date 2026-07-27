@@ -17,9 +17,9 @@
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature DS18B20(&oneWire);
 
-//global array for 1wire data
+//global array for 1wire data - fixed size so known sensors survive across rescans
 dallasDataStruct* actDallasData = 0;
-int dallasDevicecount = 0;
+int dallasDevicecount = 0; // kept as the array length (MAX_DALLAS_SENSORS) for external callers; iterate using the "known" flag
 
 
 unsigned long lastalldatatime_dallas = 0;
@@ -29,39 +29,92 @@ unsigned long dallasTimer1 = 0;
 unsigned int updateAllDallasTime = 30000; // will be set using heishmonSettings
 unsigned int dallasTimerWait = 30000; // will be set using heishmonSettings
 void loadDallasAlias();
+void saveDallasAliasFile();
 
-void initDallasSensors(void (*log_message)(char*), unsigned int updateAllDallasTimeSettings, unsigned int dallasTimerWaitSettings, unsigned int dallasResolution) {
+static int findDallasSlot(const char* address) {
+  for (int i = 0; i < MAX_DALLAS_SENSORS; i++) {
+    if (actDallasData[i].known && strcmp(actDallasData[i].address, address) == 0) return i;
+  }
+  return -1;
+}
+
+static int findFreeDallasSlot() {
+  for (int i = 0; i < MAX_DALLAS_SENSORS; i++) {
+    if (!actDallasData[i].known) return i;
+  }
+  return -1;
+}
+
+// parses a 16 hex char address string (as produced/stored in .address) back into a DeviceAddress,
+// so sensors restored purely from mqtt can still be addressed directly on the bus without a rescan
+static void parseDallasAddress(const char* addrStr, DeviceAddress out) {
+  for (int x = 0; x < 8; x++) {
+    char byteStr[3] = { addrStr[x * 2], addrStr[x * 2 + 1], '\0' };
+    out[x] = (uint8_t) strtoul(byteStr, NULL, 16);
+  }
+}
+
+void rescanDallasSensors(void (*log_message)(char*), unsigned int dallasResolution) {
   char log_msg[256];
-  updateAllDallasTime = updateAllDallasTimeSettings;
-  dallasTimerWait = dallasTimerWaitSettings;
-  DS18B20.begin();
-  dallasDevicecount  = DS18B20.getDeviceCount();
-  sprintf_P(log_msg, PSTR("Number of 1wire sensors on bus: %d"), dallasDevicecount); log_message(log_msg);
-  if ( dallasDevicecount > MAX_DALLAS_SENSORS) {
-    dallasDevicecount = MAX_DALLAS_SENSORS;
-    sprintf_P(log_msg, PSTR("Reached max 1wire sensor count. Only %d sensors will provide data."), dallasDevicecount);
-    log_message(log_msg);
+  DS18B20.begin(); // re-search the bus so newly attached sensors are actually detected
+  int found = DS18B20.getDeviceCount();
+  sprintf_P(log_msg, PSTR("Number of 1wire sensors on bus: %d"), found); log_message(log_msg);
+
+  //assume known sensors are gone until the scan below re-affirms them
+  for (int i = 0; i < MAX_DALLAS_SENSORS; i++) {
+    if (actDallasData[i].known) actDallasData[i].present = false;
   }
 
-  //init array
-  delete actDallasData;
-  actDallasData = new dallasDataStruct [dallasDevicecount];
-  for (int j = 0 ; j < dallasDevicecount; j++) {
-    DS18B20.getAddress(actDallasData[j].sensor, j);
-    DS18B20.setResolution(actDallasData[j].sensor, dallasResolution);
-  }
-
-  DS18B20.requestTemperatures();
-  for (int i = 0 ; i < dallasDevicecount; i++) {
-    actDallasData[i].address[16] = '\0';
-    for (int x = 0; x < 8; x++)  {
-      // zero pad the address if necessary
-      sprintf(&actDallasData[i].address[x * 2], "%02x", actDallasData[i].sensor[x]);
+  for (int j = 0; j < found; j++) {
+    DeviceAddress addr;
+    if (!DS18B20.getAddress(addr, j)) continue;
+    char addrStr[17];
+    addrStr[16] = '\0';
+    for (int x = 0; x < 8; x++) {
+      sprintf(&addrStr[x * 2], "%02x", addr[x]);
     }
-    sprintf_P(log_msg, PSTR("Found 1wire sensor: %s"), actDallasData[i].address ); log_message(log_msg);
+
+    int slot = findDallasSlot(addrStr);
+    if (slot < 0) {
+      slot = findFreeDallasSlot();
+      if (slot < 0) {
+        sprintf_P(log_msg, PSTR("Reached max 1wire sensor count (%d). Ignoring sensor: %s"), MAX_DALLAS_SENSORS, addrStr);
+        log_message(log_msg);
+        continue;
+      }
+      actDallasData[slot].known = true;
+      strlcpy(actDallasData[slot].address, addrStr, sizeof(actDallasData[slot].address));
+      actDallasData[slot].temperature = -127.0;
+      actDallasData[slot].lastgoodtime = 0;
+      strlcpy(actDallasData[slot].alias, "NOT SET", sizeof(actDallasData[slot].alias));
+      sprintf_P(log_msg, PSTR("Found new 1wire sensor: %s"), addrStr); log_message(log_msg);
+      sprintf_P(log_msg, PSTR("{\"data\": {\"dallasRescan\": true}}")); websocket_write_all(log_msg, strlen(log_msg)); // tell open browser tabs to reload the sensor table
+    }
+    memcpy(actDallasData[slot].sensor, addr, sizeof(DeviceAddress));
+    actDallasData[slot].present = true;
+    DS18B20.setResolution(addr, dallasResolution);
   }
+
+  for (int i = 0; i < MAX_DALLAS_SENSORS; i++) {
+    if (actDallasData[i].known && !actDallasData[i].present) {
+      sprintf_P(log_msg, PSTR("Known 1wire sensor not responding: %s"), actDallasData[i].address); log_message(log_msg);
+    }
+  }
+
   if (DALLASASYNC) DS18B20.setWaitForConversion(false); //async 1wire during next loops
   loadDallasAlias();
+}
+
+void initDallasSensors(void (*log_message)(char*), unsigned int updateAllDallasTimeSettings, unsigned int dallasTimerWaitSettings, unsigned int dallasResolution) {
+  updateAllDallasTime = updateAllDallasTimeSettings;
+  dallasTimerWait = dallasTimerWaitSettings;
+
+  if (!actDallasData) {
+    actDallasData = new dallasDataStruct [MAX_DALLAS_SENSORS];
+    dallasDevicecount = MAX_DALLAS_SENSORS;
+  }
+
+  rescanDallasSensors(log_message, dallasResolution);
 }
 
 void resetlastalldatatime_dallas() {
@@ -80,12 +133,28 @@ void readNewDallasTemp(PubSubClient &mqtt_client, void (*log_message)(char*), ch
   }
   if (!(DALLASASYNC)) DS18B20.requestTemperatures();
   for (int i = 0; i < dallasDevicecount; i++) {
+    if (!actDallasData[i].known) continue; // query every known sensor, even ones currently marked offline, so they can be marked online again once they respond
     float temp = DS18B20.getTempC(actDallasData[i].sensor);
+    bool wasPresent = actDallasData[i].present;
     if (temp < -120.0) {
-      sprintf_P(log_msg, PSTR("Error 1wire sensor offline: %s"), actDallasData[i].address); log_message(log_msg);
+      actDallasData[i].present = false;
+      if (wasPresent) {
+        sprintf_P(log_msg, PSTR("1wire sensor went offline: %s"), actDallasData[i].address); log_message(log_msg);
+        sprintf_P(log_msg, PSTR("{\"data\": {\"dallasvalues\": {\"sensorID\": \"%s\", \"present\": false}}}"), actDallasData[i].address);
+        websocket_write_all(log_msg, strlen(log_msg));
+      }
     } else {
+      actDallasData[i].present = true;
+      if (!wasPresent) {
+        sprintf_P(log_msg, PSTR("1wire sensor back online: %s"), actDallasData[i].address); log_message(log_msg);
+        sprintf_P(log_msg, PSTR("{\"data\": {\"dallasvalues\": {\"sensorID\": \"%s\", \"present\": true}}}"), actDallasData[i].address);
+        websocket_write_all(log_msg, strlen(log_msg));
+      }
       float allowedtempdiff = (((millis() - actDallasData[i].lastgoodtime)) / 1000.0) * MAXTEMPDIFFPERSEC;
-      if ((actDallasData[i].temperature != -127.0) and ((temp > (actDallasData[i].temperature + allowedtempdiff)) or (temp < (actDallasData[i].temperature - allowedtempdiff)))) {
+      if (fabs(temp - 85.0) < 0.0001) { // 85.0C is the DS18B20 power-on reset default, not a real reading; sensor is online, just not converted yet
+        sprintf_P(log_msg, PSTR("Ignoring 1wire sensor power-on-reset value (85.00): %s"), actDallasData[i].address);
+        log_message(log_msg);
+      } else if ((actDallasData[i].temperature != -127.0) and ((temp > (actDallasData[i].temperature + allowedtempdiff)) or (temp < (actDallasData[i].temperature - allowedtempdiff)))) {
         sprintf_P(log_msg, PSTR("Filtering 1wire sensor temperature (%s). Delta to high. Current: %.2f Last: %.2f"), actDallasData[i].address, temp, actDallasData[i].temperature);
         log_message(log_msg);
       } else {
@@ -132,7 +201,11 @@ void dallasLoop(PubSubClient &mqtt_client, void (*log_message)(char*), char* mqt
 void dallasJsonOutput(struct webserver_t *client) {
   webserver_send_content_P(client, PSTR("["), 1);
 
+  bool first = true;
   for (int i = 0; i < dallasDevicecount; i++) {
+    if (!actDallasData[i].known) continue;
+    if (!first) webserver_send_content_P(client, PSTR(","), 1);
+    first = false;
     webserver_send_content_P(client, PSTR("{\"Sensor\":\""), 11);
     webserver_send_content(client, actDallasData[i].address, strlen(actDallasData[i].address));
     webserver_send_content_P(client, PSTR("\",\"Temperature\":"), 16);
@@ -141,21 +214,25 @@ void dallasJsonOutput(struct webserver_t *client) {
     webserver_send_content(client, str, strlen(str));
     webserver_send_content_P(client, PSTR(",\"Alias\":\""), 10);
     webserver_send_content(client, actDallasData[i].alias, strlen(actDallasData[i].alias));
-    if (i < dallasDevicecount - 1) {
-      webserver_send_content_P(client, PSTR("\"},"), 3);
+    webserver_send_content_P(client, PSTR("\",\"Present\":"), 12);
+    if (actDallasData[i].present) {
+      webserver_send_content_P(client, PSTR("true"), 4);
     } else {
-      webserver_send_content_P(client, PSTR("\"}"), 2);
+      webserver_send_content_P(client, PSTR("false"), 5);
     }
+    webserver_send_content_P(client, PSTR(",\"LastSeenSeconds\":"), 19);
+    long lastSeenSeconds = (actDallasData[i].lastgoodtime == 0) ? -1 : (long)((millis() - actDallasData[i].lastgoodtime) / 1000);
+    sprintf(str, "%ld", lastSeenSeconds);
+    webserver_send_content(client, str, strlen(str));
+    webserver_send_content_P(client, PSTR("}"), 1);
   }
   webserver_send_content_P(client, PSTR("]"), 1);
 }
 
-void changeDallasAlias(char* address, char* alias) {
+void saveDallasAliasFile() {
   JsonDocument jsonDoc;
   for (int i = 0 ; i < dallasDevicecount; i++) {
-    if (strcmp(address, actDallasData[i].address) == 0) {
-      strlcpy(actDallasData[i].alias, alias, sizeof(actDallasData[i].alias));
-    }
+    if (!actDallasData[i].known) continue;
     jsonDoc[actDallasData[i].address] = actDallasData[i].alias;
   }
   if (LittleFS.begin()) {
@@ -164,6 +241,50 @@ void changeDallasAlias(char* address, char* alias) {
       serializeJson(jsonDoc, configFile);
       configFile.close();
     }
+  }
+}
+
+void changeDallasAlias(char* address, char* alias) {
+  int slot = findDallasSlot(address);
+  if (slot < 0) return;
+  strlcpy(actDallasData[slot].alias, alias, sizeof(actDallasData[slot].alias));
+  saveDallasAliasFile();
+}
+
+void removeDallasSensor(PubSubClient &mqtt_client, char* mqtt_topic_base, char* address, void (*log_message)(char*)) {
+  char log_msg[256];
+  int slot = findDallasSlot(address);
+  if (slot < 0) return;
+
+  char mqtt_topic[256];
+  // publishing an empty retained payload clears the previously retained message on the broker
+  sprintf_P(mqtt_topic, PSTR("%s/%s/%s"), mqtt_topic_base, mqtt_topic_1wire, address); mqtt_client.publish(mqtt_topic, "", true);
+  sprintf_P(mqtt_topic, PSTR("%s/%s/%s/alias"), mqtt_topic_base, mqtt_topic_1wire, address); mqtt_client.publish(mqtt_topic, "", true);
+
+  sprintf_P(log_msg, PSTR("Removed 1wire sensor: %s"), address); log_message(log_msg);
+
+  actDallasData[slot] = dallasDataStruct();
+  saveDallasAliasFile();
+  sprintf_P(log_msg, PSTR("{\"data\": {\"dallasRescan\": true}}")); websocket_write_all(log_msg, strlen(log_msg)); // tell open browser tabs to reload the sensor table
+}
+
+void restoreDallasFromMqtt(char* address, float temperature, void (*log_message)(char*)) {
+  char log_msg[256];
+  int slot = findDallasSlot(address);
+  if (slot < 0) {
+    slot = findFreeDallasSlot();
+    if (slot < 0) return; //no room left, ignore
+    actDallasData[slot].known = true;
+    actDallasData[slot].present = false;
+    strlcpy(actDallasData[slot].address, address, sizeof(actDallasData[slot].address));
+    if (strlen(address) == 16) parseDallasAddress(address, actDallasData[slot].sensor); // allows this sensor to be polled directly without waiting for a bus rescan
+    strlcpy(actDallasData[slot].alias, "NOT SET", sizeof(actDallasData[slot].alias));
+    sprintf_P(log_msg, PSTR("Restored previously known 1wire sensor from mqtt: %s"), address); log_message(log_msg);
+    loadDallasAlias();
+    sprintf_P(log_msg, PSTR("{\"data\": {\"dallasRescan\": true}}")); websocket_write_all(log_msg, strlen(log_msg)); // tell open browser tabs to reload the sensor table
+  }
+  if (actDallasData[slot].lastgoodtime == 0) { //only backfill if we haven't taken a real reading yet this boot
+    actDallasData[slot].temperature = temperature;
   }
 }
 
@@ -179,6 +300,7 @@ void loadDallasAlias() {
         DeserializationError error = deserializeJson(jsonDoc, buf.get());
         if (!error) {
           for (int i = 0 ; i < dallasDevicecount; i++) {
+            if (!actDallasData[i].known) continue;
             if ( jsonDoc[actDallasData[i].address] ) strncpy(actDallasData[i].alias, jsonDoc[actDallasData[i].address], sizeof(actDallasData[i].alias));
           }
         }
