@@ -1470,7 +1470,7 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
 
             } break;
           case 180: {
-|             if (heishamonSettings.use_1wire) rescanDallasSensors(log_message, heishamonSettings.dallasResolution);
+              if (heishamonSettings.use_1wire) rescanDallasSensors(log_message, heishamonSettings.dallasResolution);
             } break;
           case 191: {
               if (client->content == 0) {
