@@ -1093,7 +1093,7 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
         } else if (strcmp_P((char *)dat, PSTR("/factoryreset")) == 0) {
           client->route = 90;
         } else if (strcmp_P((char *)dat, PSTR("/gpio")) == 0) {
-          client->route = 190;
+          client->route = 191;
         } else if (strcmp_P((char *)dat, PSTR("/command")) == 0) {
           if ((client->userdata = malloc(1)) == NULL) {
             loggingSerial.printf(PSTR("Out of memory %s:#%d\n"), __FUNCTION__, __LINE__);
@@ -1230,7 +1230,7 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
           case 110: {
               return cacheSettings(client, args);
             } break;
-          case 190: {
+          case 191: {
               // GPIO web API: POST args "pin" (1-indexed extra GPIO) and "value" (0/1/on/off/true/false)
               // Store pin index in userdata between arg callbacks
               if (strcmp_P((char *)args->name, PSTR("pin")) == 0) {
@@ -1472,7 +1472,7 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
           case 180: {
 |             if (heishamonSettings.use_1wire) rescanDallasSensors(log_message, heishamonSettings.dallasResolution);
             } break;
-          case 190: {
+          case 191: {
               if (client->content == 0) {
                 webserver_send(client, 200, (char *)"application/json", 0);
                 return 0;
