@@ -31,6 +31,7 @@ static const char webCSS[] FLASHPROG = R"====(
   --green:#28a745;
   --green-glow:rgba(40,167,69,0.15);
   --orange:#fd7e14;
+  --switch-track:#c3c9d1;
   --radius:8px;
   --radius-sm:5px;
   --radius-lg:12px;
@@ -57,6 +58,7 @@ html.dark-mode {
   --green:#2ecc94;
   --green-glow:rgba(46,204,148,0.2);
   --orange:#f0a500;
+  --switch-track:#3a4257;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -292,7 +294,8 @@ tbody td:first-child{color:var(--text-primary);font-family:'JetBrains Mono',mono
   left:0;
   right:0;
   bottom:0;
-  background:var(--border);
+  background:var(--switch-track);
+  border:1px solid var(--border);
   transition:0.3s;
   border-radius:18px;
 }
@@ -309,6 +312,7 @@ tbody td:first-child{color:var(--text-primary);font-family:'JetBrains Mono',mono
 }
 input:checked + .theme-slider-compact {
   background:var(--accent);
+  border-color:var(--accent);
 }
 input:checked + .theme-slider-compact:before {
   transform:translateX(14px);
