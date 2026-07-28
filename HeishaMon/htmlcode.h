@@ -892,11 +892,8 @@ function startWebsockets(){
             updCell(j.data.opentherm.name+'-value',j.data.opentherm.value);
           } else if(j.data.gpio){
             var gpioCell=document.getElementById('gpio-'+j.data.gpio.pin+'-state');
-            if(gpioCell){
-              var gpioInput=gpioCell.querySelector('input[type=checkbox]');
-              if(gpioInput)gpioInput.checked=!!j.data.gpio.state;
-              else gpioCell.textContent=j.data.gpio.state?'HIGH':'LOW';
-            }
+            var gpioInput=gpioCell&&gpioCell.querySelector('input[type=checkbox]');
+            if(gpioInput)gpioInput.checked=!!j.data.gpio.state;
           } else if(j.data.dallasRescan){
             refreshDallasTable();
           }
@@ -1122,16 +1119,16 @@ function renderGpioTable(d){
     var modeCell=document.createElement('td');modeCell.textContent=gpioModeNames[item.mode]||item.mode;row.appendChild(modeCell);
     var stateCell=document.createElement('td');
     stateCell.id='gpio-'+item.pin+'-state';
+    var label=document.createElement('label');label.className='theme-switch-compact';
+    var input=document.createElement('input');input.type='checkbox';input.checked=!!item.state;
     if(item.mode===2){
-      var label=document.createElement('label');label.className='theme-switch-compact';
-      var input=document.createElement('input');input.type='checkbox';input.checked=!!item.state;
       input.onchange=function(){toggleGpio(item.pin,this.checked);};
-      var slider=document.createElement('span');slider.className='theme-slider-compact';
-      label.appendChild(input);label.appendChild(slider);
-      stateCell.appendChild(label);
     } else {
-      stateCell.textContent=item.state?'HIGH':'LOW';
+      input.disabled=true;
     }
+    var slider=document.createElement('span');slider.className='theme-slider-compact';
+    label.appendChild(input);label.appendChild(slider);
+    stateCell.appendChild(label);
     row.appendChild(stateCell);
     tb.appendChild(row);
   });
