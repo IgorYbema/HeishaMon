@@ -278,6 +278,7 @@ tbody td:first-child{color:var(--text-primary);font-family:'JetBrains Mono',mono
   letter-spacing:0.3px;
 }
 .theme-switch-compact {
+  display:inline-block;
   position:relative;
   width:32px;
   height:18px;
