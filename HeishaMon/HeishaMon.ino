@@ -1240,7 +1240,7 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
                 client->userdata = (void*)(intptr_t)pin_idx;
               } else if (strcmp_P((char *)args->name, PSTR("value")) == 0) {
                 int idx = (int)(intptr_t)client->userdata - 1; // convert to 0-indexed
-                if (idx >= 0 && idx < NUMGPIO_USER && heishamonSettings.gpioSettings.gpioMode[idx] == OUTPUT) {
+                if (idx >= 0 && idx < NUMGPIO_USER && heishamonSettings.gpioSettings.gpioMode[NUMGPIO_RELAY + idx] == OUTPUT) {
                   char val_str[8];
                   snprintf(val_str, sizeof(val_str), "%.*s", args->len, args->value);
                   char topic[16];

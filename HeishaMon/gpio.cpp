@@ -13,12 +13,12 @@ static bool toGPIOValue(char* value) {
 }
 
 void setupGPIO(gpioSettingsStruct &gpioSettings) {
-  // Apply user-configurable modes to the non-relay GPIO pins
+  // Apply user-configurable modes to the non-relay GPIO pins (relays occupy the first NUMGPIO_RELAY slots)
   for (int i = 0; i < NUMGPIO_USER; i++) {
     switch (gpioSettings.gpioUserMode[i]) {
-      case GPIO_MODE_INPUT:        gpioSettings.gpioMode[i] = INPUT;        break;
-      case GPIO_MODE_OUTPUT:       gpioSettings.gpioMode[i] = OUTPUT;       break;
-      default:                     gpioSettings.gpioMode[i] = INPUT_PULLUP; break;
+      case GPIO_MODE_INPUT:        gpioSettings.gpioMode[NUMGPIO_RELAY + i] = INPUT;        break;
+      case GPIO_MODE_OUTPUT:       gpioSettings.gpioMode[NUMGPIO_RELAY + i] = OUTPUT;       break;
+      default:                     gpioSettings.gpioMode[NUMGPIO_RELAY + i] = INPUT_PULLUP; break;
     }
   }
   for (int i = 0; i < NUMGPIO; i++) {
@@ -44,11 +44,14 @@ void mqttGPIOCallback(char* topic, char* value, gpioSettingsStruct &gpioSettings
   // Handle user-configurable output GPIOs: topic "extra/N" (1-indexed)
   if (strncmp_P(topic, PSTR("extra/"), 6) == 0) {
     int idx = atoi(topic + 6) - 1;  // convert 1-indexed to 0-indexed
-    if (idx >= 0 && idx < NUMGPIO_USER && gpioSettings.gpioMode[idx] == OUTPUT) {
-      char log_msg[64];
-      snprintf_P(log_msg, sizeof(log_msg), PSTR("GPIO: set extra/%d (pin %d) = %s"), idx + 1, gpioSettings.gpioPin[idx], value);
-      log_message(log_msg);
-      digitalWrite(gpioSettings.gpioPin[idx], toGPIOValue(value));
+    if (idx >= 0 && idx < NUMGPIO_USER) {
+      int pinIdx = NUMGPIO_RELAY + idx;
+      if (gpioSettings.gpioMode[pinIdx] == OUTPUT) {
+        char log_msg[64];
+        snprintf_P(log_msg, sizeof(log_msg), PSTR("GPIO: set extra/%d (pin %d) = %s"), idx + 1, gpioSettings.gpioPin[pinIdx], value);
+        log_message(log_msg);
+        digitalWrite(gpioSettings.gpioPin[pinIdx], toGPIOValue(value));
+      }
     }
   }
 }
@@ -67,8 +70,8 @@ void publishGPIOStates(PubSubClient &mqtt_client, gpioSettingsStruct &gpioSettin
     int state = digitalRead(gpioSettings.gpioPin[i]);
     if (publishAll || state != lastState[i]) {
       lastState[i] = state;
-      if (i < NUMGPIO_USER && mqttConnected) {
-        snprintf_P(topic, sizeof(topic), PSTR("%s/gpio/extra/%d"), mqtt_topic_base, i + 1);
+      if (i >= NUMGPIO_RELAY && mqttConnected) {
+        snprintf_P(topic, sizeof(topic), PSTR("%s/gpio/extra/%d"), mqtt_topic_base, i - NUMGPIO_RELAY + 1);
         mqtt_client.publish(topic, state ? "1" : "0", true);
       }
       int len = snprintf_P(wsmsg, sizeof(wsmsg), PSTR("{\"data\": {\"gpio\": {\"pin\": %d, \"state\": %d}}}"),
@@ -83,7 +86,7 @@ void gpioJsonOutput(struct webserver_t *client, gpioSettingsStruct &gpioSettings
   webserver_send_content_P(client, PSTR("["), 1);
   for (int i = 0; i < NUMGPIO; i++) {
     int state = digitalRead(gpioSettings.gpioPin[i]);
-    int mode = (i < NUMGPIO_USER) ? gpioSettings.gpioUserMode[i] : GPIO_MODE_OUTPUT;
+    int mode = (i < NUMGPIO_RELAY) ? GPIO_MODE_OUTPUT : gpioSettings.gpioUserMode[i - NUMGPIO_RELAY];
     int len = snprintf_P(buf, sizeof(buf), PSTR("%s{\"pin\":%d,\"mode\":%d,\"state\":%d}"),
                          i > 0 ? "," : "", gpioSettings.gpioPin[i], mode, state);
     webserver_send_content(client, buf, len);

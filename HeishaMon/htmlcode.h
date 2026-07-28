@@ -1105,13 +1105,13 @@ var gpioModeNames={0:'Input (pull-up)',1:'Input',2:'Output'};
 function renderGpioTable(d){
   if(!(d&&d.gpio&&Array.isArray(d.gpio)))return;
   var tb=document.getElementById('gpiovalues');tb.innerHTML='';
-  // last 2 pins are the fixed relays on boards that have them (ESP32); others are user-configurable GPIOs
-  var relayStart=d.gpio.length>5?d.gpio.length-2:d.gpio.length;
+  // first 2 pins are the fixed relays on boards that have them (ESP32); the rest are user-configurable GPIOs
+  var relayCount=d.gpio.length>5?2:0;
   var extraIdx=0,relayIdx=0;
   d.gpio.forEach(function(item,i){
     var row=document.createElement('tr');
     var nameCell=document.createElement('td');
-    nameCell.textContent=i>=relayStart?('Relay '+(++relayIdx)):('GPIO '+(++extraIdx));
+    nameCell.textContent=i<relayCount?('Relay '+(++relayIdx)):('GPIO '+(++extraIdx));
     row.appendChild(nameCell);
     var pinCell=document.createElement('td');pinCell.textContent=item.pin;row.appendChild(pinCell);
     var modeCell=document.createElement('td');modeCell.textContent=gpioModeNames[item.mode]||item.mode;row.appendChild(modeCell);
@@ -1812,13 +1812,13 @@ static const char settingsForm2[] FLASHPROG = R"====(
   <div class='panel' style='margin-bottom:16px'>
   <div class='panel-header'><h3>Extra GPIO</h3></div>
   <div class='settings-grid'>
+    <div class='setting-row'><label class='setting-label'>Relay 1 (pin 21)</label><select class='setting-input' disabled><option value='2' selected>Output</option></select></div>
+    <div class='setting-row'><label class='setting-label'>Relay 2 (pin 47)</label><select class='setting-input' disabled><option value='2' selected>Output</option></select></div>
     <div class='setting-row'><label class='setting-label'>GPIO 1 (pin 33)</label><select name='gpio_1_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
     <div class='setting-row'><label class='setting-label'>GPIO 2 (pin 34)</label><select name='gpio_2_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
     <div class='setting-row'><label class='setting-label'>GPIO 3 (pin 35)</label><select name='gpio_3_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
     <div class='setting-row'><label class='setting-label'>GPIO 4 (pin 36)</label><select name='gpio_4_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
     <div class='setting-row'><label class='setting-label'>GPIO 5 (pin 37)</label><select name='gpio_5_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
-    <div class='setting-row'><label class='setting-label'>Relay 1 (pin 21)</label><select class='setting-input' disabled><option value='2' selected>Output</option></select></div>
-    <div class='setting-row'><label class='setting-label'>Relay 2 (pin 47)</label><select class='setting-input' disabled><option value='2' selected>Output</option></select></div>
   </div></div>
   <div class='form-actions'>
     <button type='submit' class='btn btn-primary'>Save Settings</button>
