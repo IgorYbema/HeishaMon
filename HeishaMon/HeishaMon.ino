@@ -1231,21 +1231,28 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
               return cacheSettings(client, args);
             } break;
           case 191: {
-              // GPIO web API: POST args "pin" (1-indexed extra GPIO) and "value" (0/1/on/off/true/false)
-              // Store pin index in userdata between arg callbacks
+              // GPIO web API: args "pin" (physical GPIO pin number) and "value" (0/1/on/off/true/false)
+              // Store the physical pin number in userdata between arg callbacks
               if (strcmp_P((char *)args->name, PSTR("pin")) == 0) {
                 char pin_str[8];
                 snprintf(pin_str, sizeof(pin_str), "%.*s", args->len, args->value);
-                int pin_idx = atoi(pin_str); // 1-indexed
-                client->userdata = (void*)(intptr_t)pin_idx;
+                int phys_pin = atoi(pin_str);
+                client->userdata = (void*)(intptr_t)phys_pin;
               } else if (strcmp_P((char *)args->name, PSTR("value")) == 0) {
-                int idx = (int)(intptr_t)client->userdata - 1; // convert to 0-indexed
-                if (idx >= 0 && idx < NUMGPIO_USER && heishamonSettings.gpioSettings.gpioMode[NUMGPIO_RELAY + idx] == OUTPUT) {
-                  char val_str[8];
-                  snprintf(val_str, sizeof(val_str), "%.*s", args->len, args->value);
-                  char topic[16];
-                  snprintf_P(topic, sizeof(topic), PSTR("extra/%d"), idx + 1);
-                  mqttGPIOCallback(topic, val_str, heishamonSettings.gpioSettings);
+                int phys_pin = (int)(intptr_t)client->userdata;
+                char val_str[8];
+                snprintf(val_str, sizeof(val_str), "%.*s", args->len, args->value);
+                for (int i = 0; i < NUMGPIO; i++) {
+                  if ((int)heishamonSettings.gpioSettings.gpioPin[i] == phys_pin && heishamonSettings.gpioSettings.gpioMode[i] == OUTPUT) {
+                    char topic[16];
+                    if (i < NUMGPIO_RELAY) {
+                      snprintf_P(topic, sizeof(topic), i == 0 ? PSTR("relay/one") : PSTR("relay/two"));
+                    } else {
+                      snprintf_P(topic, sizeof(topic), PSTR("extra/%d"), i - NUMGPIO_RELAY + 1);
+                    }
+                    mqttGPIOCallback(topic, val_str, heishamonSettings.gpioSettings);
+                    break;
+                  }
                 }
                 client->userdata = NULL;
               }
