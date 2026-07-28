@@ -36,9 +36,10 @@ struct gpioSettingsStruct {
 
 class PubSubClient;
 struct webserver_t;
-void setupGPIO(gpioSettingsStruct &gpioSettings);
-void mqttGPIOCallback(char* topic, char* value, gpioSettingsStruct &gpioSettings);
-void publishGPIOStates(PubSubClient &mqtt_client, gpioSettingsStruct &gpioSettings, char* mqtt_topic_base, bool publishAll);
-void gpioJsonOutput(struct webserver_t *client, gpioSettingsStruct &gpioSettings);
+void setupGPIO(gpioSettingsStruct &gpioSettings, bool openthermEnabled, bool listenOnly);
+void mqttGPIOCallback(char* topic, char* value, gpioSettingsStruct &gpioSettings, bool openthermEnabled, bool listenOnly);
+void publishGPIOStates(PubSubClient &mqtt_client, gpioSettingsStruct &gpioSettings, char* mqtt_topic_base, bool publishAll, bool openthermEnabled, bool listenOnly);
+void gpioJsonOutput(struct webserver_t *client, gpioSettingsStruct &gpioSettings, bool openthermEnabled, bool listenOnly);
+bool extraGPIOBlockedByListenOnly(bool listenOnly); // true when the whole GPIO tab/panel should be hidden (ESP8266 in listen-only mode)
 
 

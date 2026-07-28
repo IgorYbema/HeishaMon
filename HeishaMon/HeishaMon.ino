@@ -509,7 +509,7 @@ void mqtt_reconnect()
       if (mqttReconnects == 1) { //only resend all data on first connect to mqtt so a data bomb like and bad mqtt server will not cause a reconnect bomb everytime
         if (heishamonSettings.use_1wire) resetlastalldatatime_dallas(); //resend all 1wire values to mqtt
         resetlastalldatatime(); //resend all heatpump values to mqtt
-        publishGPIOStates(mqtt_client, heishamonSettings.gpioSettings, heishamonSettings.mqtt_topic_base, true); //publish all GPIO states on first connect
+        publishGPIOStates(mqtt_client, heishamonSettings.gpioSettings, heishamonSettings.mqtt_topic_base, true, heishamonSettings.opentherm, heishamonSettings.listenonly); //publish all GPIO states on first connect
       }
       //use this to receive valid heishamon raw data from other heishamon to debug this OT code
 //#define RAWDEBUG
@@ -1009,7 +1009,7 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
       mqttOTCallback(topic_otcommand, msg);
     } else if (strncmp(topic_command, mqtt_topic_gpio, strlen(mqtt_topic_gpio)) == 0)  {
       char* topic_gpiocommand = topic_command + strlen(mqtt_topic_gpio) + 1; //strip the gpio subtopic from the topic
-      mqttGPIOCallback(topic_gpiocommand, msg, heishamonSettings.gpioSettings);
+      mqttGPIOCallback(topic_gpiocommand, msg, heishamonSettings.gpioSettings, heishamonSettings.opentherm, heishamonSettings.listenonly);
     } else if (strncmp(topic_command, mqtt_topic_1wire, strlen(mqtt_topic_1wire)) == 0) { //this is a 1wire address topic, restore its retained value at boot
       char* topic_1wire_address = topic_command + strlen(mqtt_topic_1wire) + 1; //strip the "1wire/" from the topic to get the sensor address
       if ((strchr(topic_1wire_address, '/') == NULL) && (length > 0)) { //only handle the address topic itself (not .../alias) and skip empty (cleared) retained messages
@@ -1250,7 +1250,7 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
                     } else {
                       snprintf_P(topic, sizeof(topic), PSTR("extra/%d"), i - NUMGPIO_RELAY + 1);
                     }
-                    mqttGPIOCallback(topic, val_str, heishamonSettings.gpioSettings);
+                    mqttGPIOCallback(topic, val_str, heishamonSettings.gpioSettings, heishamonSettings.opentherm, heishamonSettings.listenonly);
                     break;
                   }
                 }
@@ -1383,7 +1383,7 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
             } break;
           case 110: {
               int ret = saveSettings(client, &heishamonSettings);
-              setupGPIO(heishamonSettings.gpioSettings); //re-apply GPIO pin modes if they changed
+              setupGPIO(heishamonSettings.gpioSettings, heishamonSettings.opentherm, heishamonSettings.listenonly); //re-apply GPIO pin modes if they changed
               #ifdef ESP8266
               if ((!heishamonSettings.opentherm) && (heishamonSettings.listenonly)) {
                 //make sure we disable TX to heatpump-RX using the mosfet so this line is floating and will not disturb cz-taw1
@@ -1484,7 +1484,7 @@ int8_t webserver_cb(struct webserver_t *client, void *dat) {
                 webserver_send(client, 200, (char *)"application/json", 0);
                 return 0;
               } else if (client->content == 1) {
-                gpioJsonOutput(client, heishamonSettings.gpioSettings);
+                gpioJsonOutput(client, heishamonSettings.gpioSettings, heishamonSettings.opentherm, heishamonSettings.listenonly);
                 return 0;
               }
               return -1;
@@ -1662,7 +1662,7 @@ void switchSerial() {
   proxySerial.flush();  
 #endif
 
-  setupGPIO(heishamonSettings.gpioSettings); //switch extra GPIOs to configured mode
+  setupGPIO(heishamonSettings.gpioSettings, heishamonSettings.opentherm, heishamonSettings.listenonly); //switch extra GPIOs to configured mode
 
   //mosfet output enable
   pinMode(ENABLEPIN, OUTPUT);
@@ -2080,7 +2080,7 @@ void loop() {
 
   if (heishamonSettings.use_s0) s0Loop(mqtt_client, log_message, heishamonSettings.mqtt_topic_base, heishamonSettings.s0Settings);
 
-  publishGPIOStates(mqtt_client, heishamonSettings.gpioSettings, heishamonSettings.mqtt_topic_base, false);
+  publishGPIOStates(mqtt_client, heishamonSettings.gpioSettings, heishamonSettings.mqtt_topic_base, false, heishamonSettings.opentherm, heishamonSettings.listenonly);
 
 #ifdef ESP8266
 //this only runs on ESP8266, the ESP32 does this in vTask

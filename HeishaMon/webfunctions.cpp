@@ -1052,7 +1052,9 @@ int handleRoot(struct webserver_t *client, float readpercentage, int mqttReconne
         if (heishamonSettings->opentherm) {
           webserver_send_content_P(client, webBodyRootOpenthermTab, strlen_P(webBodyRootOpenthermTab));
         }
-        webserver_send_content_P(client, webBodyRootGpioTab, strlen_P(webBodyRootGpioTab));
+        if (!extraGPIOBlockedByListenOnly(heishamonSettings->listenonly)) {
+          webserver_send_content_P(client, webBodyRootGpioTab, strlen_P(webBodyRootGpioTab));
+        }
         webserver_send_content_P(client, webTabnavClose, strlen_P(webTabnavClose));
         if (heishamonSettings->listenonly) {
           webserver_send_content_P(client, webBodyRootStatusListenOnly, strlen_P(webBodyRootStatusListenOnly));
@@ -1070,7 +1072,9 @@ int handleRoot(struct webserver_t *client, float readpercentage, int mqttReconne
         if (heishamonSettings->use_s0) {
           webserver_send_content_P(client, webBodyRootS0Values, strlen_P(webBodyRootS0Values));
         }
-        webserver_send_content_P(client, webBodyRootGpioValues, strlen_P(webBodyRootGpioValues));
+        if (!extraGPIOBlockedByListenOnly(heishamonSettings->listenonly)) {
+          webserver_send_content_P(client, webBodyRootGpioValues, strlen_P(webBodyRootGpioValues));
+        }
       } break;
     case 3: {
         webserver_send_content_P(client, webBodyRootConsole, strlen_P(webBodyRootConsole));
@@ -1265,7 +1269,7 @@ int handleJsonOutput(struct webserver_t *client, char* actData, char* actDataExt
       openthermJsonOutput(client);
     }
     webserver_send_content_P(client, PSTR(",\"gpio\":"), 8);
-    gpioJsonOutput(client, heishamonSettings->gpioSettings);
+    gpioJsonOutput(client, heishamonSettings->gpioSettings, heishamonSettings->opentherm, heishamonSettings->listenonly);
     webserver_send_content_P(client, PSTR("}"), 1);
   }
   return 0;

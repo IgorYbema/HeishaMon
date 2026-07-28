@@ -1111,7 +1111,9 @@ async function refreshDallasTable(){
 var gpioModeNames={0:'Input (pull-up)',1:'Input',2:'Output'};
 function renderGpioTable(d){
   if(!(d&&d.gpio&&Array.isArray(d.gpio)))return;
-  var tb=document.getElementById('gpiovalues');tb.innerHTML='';
+  var tb=document.getElementById('gpiovalues');
+  if(!tb)return; // GPIO tab/pane isn't rendered at all in listen-only mode
+  tb.innerHTML='';
   // first 2 pins are the fixed relays on boards that have them (ESP32); the rest are user-configurable GPIOs
   var relayCount=d.gpio.length>5?2:0;
   var extraIdx=0,relayIdx=0;
@@ -1456,6 +1458,28 @@ function ShowHideDallasTable(cb){
 function ShowHideS0Table(cb){
   document.getElementById('s0settings').style.display=cb.checked?'block':'none';
 }
+function updateGPIORowVisibility(){
+  // On ESP8266, two hardware facts make some Extra GPIO settings unusable:
+  // - Opentherm hardwires pins 1 and 3 (GPIO 1/GPIO 2) for its own TX/RX while it's enabled.
+  // - Listen-only mode skips enabling the shared level shifter/mosfets on boot, so ALL extra
+  //   GPIO pins are left unpowered/floating while it's enabled.
+  var otEl=document.getElementsByName('opentherm')[0];
+  var loEl=document.getElementsByName('listenonly')[0];
+  var otOn=!!(otEl&&otEl.checked);
+  var loOn=!!(loEl&&loEl.checked);
+  document.querySelectorAll('.gpio-row').forEach(function(row){
+    var hide=loOn||(otOn&&row.classList.contains('ot-conflict-gpio'));
+    row.style.display=hide?'none':'';
+    var sel=row.querySelector('select');
+    if(sel)sel.disabled=hide;
+  });
+  document.querySelectorAll('.ot-conflict-note').forEach(function(row){
+    row.style.display=(otOn&&!loOn)?'':'none';
+  });
+  document.querySelectorAll('.lo-conflict-note').forEach(function(row){
+    row.style.display=loOn?'':'none';
+  });
+}
 function changeMinWatt(port){
   var ppkwh=document.getElementById('s0_ppkwh_'+port).value;
   var interval=document.getElementById('s0_interval_'+port).value;
@@ -1660,13 +1684,13 @@ static const char settingsForm2[] FLASHPROG = R"====(
     <div class='setting-row'><label class='setting-label'>Debug hexdump from start</label><div class='checkbox-wrap'><input type='checkbox' name='logHexdump' value='enabled'></div></div>
     <div class='setting-row'><label class='setting-label'>Debug log to serial1 (GPIO2)</label><div class='checkbox-wrap'><input type='checkbox' name='logSerial1' value='enabled'></div></div>
     <div class='setting-row'><label class='setting-label'>Emulate optional PCB</label><div class='checkbox-wrap'><input type='checkbox' name='optionalPCB' value='enabled'></div></div>
-    <div class='setting-row'><label class='setting-label'>Enable Opentherm processing</label><div class='checkbox-wrap'><input type='checkbox' name='opentherm' value='enabled'></div></div>
+    <div class='setting-row'><label class='setting-label'>Enable Opentherm processing</label><div class='checkbox-wrap'><input type='checkbox' onclick='updateGPIORowVisibility()' name='opentherm' value='enabled'></div></div>
     <div class='setting-row'><label class='setting-label'>Force load rules on boot</label><div style='display:flex;align-items:center;gap:10px'><div class='checkbox-wrap'><input type='checkbox' name='force_rules' value='enabled'></div><span class='setting-hint' style='display:block;margin-top:4px'>Rules load normally, but skip after crashes to prevent boot loops. Enable to override.</span></div></div>
   </div></div>
   <div class='panel' style='margin-bottom:16px'>
   <div class='panel-header'><h3>Listen Only</h3></div>
   <div class='settings-grid'>
-    <div class='setting-row'><label class='setting-label'>Listen only (parallel CZ-TAW1)</label><div class='checkbox-wrap'><input type='checkbox' name='listenonly' value='enabled'></div></div>
+    <div class='setting-row'><label class='setting-label'>Listen only (parallel CZ-TAW1)</label><div class='checkbox-wrap'><input type='checkbox' onclick='updateGPIORowVisibility()' name='listenonly' value='enabled'></div></div>
   </div></div>
   <div class='panel' style='margin-bottom:16px'>
   <div class='panel-header'><h3>1-Wire DS18B20</h3></div>
@@ -1722,9 +1746,11 @@ static const char settingsForm2[] FLASHPROG = R"====(
   <div class='panel' style='margin-bottom:16px'>
   <div class='panel-header'><h3>Extra GPIO</h3></div>
   <div class='settings-grid'>
-    <div class='setting-row'><label class='setting-label'>GPIO 1 (pin 1)</label><select name='gpio_1_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
-    <div class='setting-row'><label class='setting-label'>GPIO 2 (pin 3)</label><select name='gpio_2_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
-    <div class='setting-row'><label class='setting-label'>GPIO 3 (pin 16)</label><select name='gpio_3_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
+    <div class='setting-row gpio-row ot-conflict-gpio'><label class='setting-label'>GPIO 1 (pin 1)</label><select name='gpio_1_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
+    <div class='setting-row gpio-row ot-conflict-gpio'><label class='setting-label'>GPIO 2 (pin 3)</label><select name='gpio_2_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
+    <div class='setting-row gpio-row'><label class='setting-label'>GPIO 3 (pin 16)</label><select name='gpio_3_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
+    <div class='setting-row ot-conflict-note' style='display:none'><span class='setting-hint' style='padding:8px 0'>GPIO 1 and GPIO 2 are reserved for Opentherm's TX/RX while it's enabled.</span></div>
+    <div class='setting-row lo-conflict-note' style='display:none'><span class='setting-hint' style='padding:8px 0'>Extra GPIOs can't be used while Listen Only is active.</span></div>
   </div></div>
   <div class='form-actions'>
     <button type='submit' class='btn btn-primary'>Save Settings</button>
@@ -1882,6 +1908,7 @@ R"====(
           if(el[0].type.indexOf('select')>-1){var ch=el[0].childNodes;for(var x=0;x<ch.length;x++){if(ch[x].value==j[k])ch[x].selected=true;}}
         }
       }
+      if(typeof updateGPIORowVisibility==='function')updateGPIORowVisibility();
       document.getElementById('loading_settings').style.display='none';
       document.getElementById('settings_form').style.display='block';
       changeMinWatt(1);changeMinWatt(2);
