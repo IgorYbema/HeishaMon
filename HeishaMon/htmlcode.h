@@ -890,6 +890,8 @@ function startWebsockets(){
             updCell('s0port-'+j.data.s0values.s0port+'-WatthourTotal',j.data.s0values.WatthourTotal);
           } else if(j.data.opentherm){
             updCell(j.data.opentherm.name+'-value',j.data.opentherm.value);
+          } else if(j.data.gpio){
+            updCell('gpio-'+j.data.gpio.pin+'-state',j.data.gpio.state?'HIGH':'LOW');
           } else if(j.data.dallasRescan){
             refreshDallasTable();
           }
@@ -1099,6 +1101,27 @@ async function refreshDallasTable(){
     renderDallasTable(d);
   }catch(e){}
 }
+var gpioModeNames={0:'Input (pull-up)',1:'Input',2:'Output'};
+function renderGpioTable(d){
+  if(!(d&&d.gpio&&Array.isArray(d.gpio)))return;
+  var tb=document.getElementById('gpiovalues');tb.innerHTML='';
+  // last 2 pins are the fixed relays on boards that have them (ESP32); others are user-configurable GPIOs
+  var relayStart=d.gpio.length>5?d.gpio.length-2:d.gpio.length;
+  var extraIdx=0,relayIdx=0;
+  d.gpio.forEach(function(item,i){
+    var row=document.createElement('tr');
+    var nameCell=document.createElement('td');
+    nameCell.textContent=i>=relayStart?('Relay '+(++relayIdx)):('GPIO '+(++extraIdx));
+    row.appendChild(nameCell);
+    var pinCell=document.createElement('td');pinCell.textContent=item.pin;row.appendChild(pinCell);
+    var modeCell=document.createElement('td');modeCell.textContent=gpioModeNames[item.mode]||item.mode;row.appendChild(modeCell);
+    var stateCell=document.createElement('td');
+    stateCell.id='gpio-'+item.pin+'-state';
+    stateCell.textContent=item.state?'HIGH':'LOW';
+    row.appendChild(stateCell);
+    tb.appendChild(row);
+  });
+}
 async function refreshTable(){
   try{
     if(isEditing)return;
@@ -1117,6 +1140,7 @@ async function refreshTable(){
       d['heatpump optional'].forEach(function(item){tb.appendChild(buildRow(item,'Topic'));});
     }
     renderDallasTable(d);
+    renderGpioTable(d);
     if(d&&d.s0&&Array.isArray(d.s0)){
       var tb=document.getElementById('s0values');tb.innerHTML='';
       d.s0.forEach(function(item){
@@ -1295,6 +1319,9 @@ static const char webBodyRootS0Tab[] FLASHPROG = R"====(
 static const char webBodyRootOpenthermTab[] FLASHPROG = R"====(
 <button class='tabnav-btn' data-tab='Opentherm' onclick="openTable('Opentherm')">Opentherm</button>
 )====";
+static const char webBodyRootGpioTab[] FLASHPROG = R"====(
+<button class='tabnav-btn' data-tab='Gpio' onclick="openTable('Gpio')">GPIO</button>
+)====";
 static const char webTabnavClose[] FLASHPROG = R"====(
   <button class='tabnav-btn' data-tab='Console' onclick="openTable('Console')">Console</button>
 </nav>
@@ -1347,6 +1374,18 @@ static const char webBodyRootOpenthermValues[] FLASHPROG = R"====(
     <th>Name</th><th>Type</th><th>Value</th>
   </tr></thead><tbody id='openthermvalues'>
     <tr><td colspan='3' style='color:var(--text-muted);padding:24px;text-align:center'>Loading…</td></tr>
+  </tbody></table>
+</div></div>
+)====";
+
+static const char webBodyRootGpioValues[] FLASHPROG = R"====(
+<div id='Gpio' class='tab-pane'>
+<div class='panel'>
+  <div class='panel-header'><h3>GPIO</h3><span class='panel-meta'>Live</span></div>
+  <table><thead><tr>
+    <th>Name</th><th>Pin</th><th>Mode</th><th>State</th>
+  </tr></thead><tbody id='gpiovalues'>
+    <tr><td colspan='4' style='color:var(--text-muted);padding:24px;text-align:center'>Loading…</td></tr>
   </tbody></table>
 </div></div>
 )====";
@@ -1778,6 +1817,8 @@ static const char settingsForm2[] FLASHPROG = R"====(
     <div class='setting-row'><label class='setting-label'>GPIO 3 (pin 35)</label><select name='gpio_3_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
     <div class='setting-row'><label class='setting-label'>GPIO 4 (pin 36)</label><select name='gpio_4_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
     <div class='setting-row'><label class='setting-label'>GPIO 5 (pin 37)</label><select name='gpio_5_mode' class='setting-input'><option value='0'>Input (pull-up)</option><option value='1'>Input</option><option value='2'>Output</option></select></div>
+    <div class='setting-row'><label class='setting-label'>Relay 1 (pin 21)</label><select class='setting-input' disabled><option value='2' selected>Output</option></select></div>
+    <div class='setting-row'><label class='setting-label'>Relay 2 (pin 47)</label><select class='setting-input' disabled><option value='2' selected>Output</option></select></div>
   </div></div>
   <div class='form-actions'>
     <button type='submit' class='btn btn-primary'>Save Settings</button>

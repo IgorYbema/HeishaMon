@@ -2073,7 +2073,7 @@ void loop() {
 
   if (heishamonSettings.use_s0) s0Loop(mqtt_client, log_message, heishamonSettings.mqtt_topic_base, heishamonSettings.s0Settings);
 
-  if (mqtt_client.connected()) publishGPIOStates(mqtt_client, heishamonSettings.gpioSettings, heishamonSettings.mqtt_topic_base, false);
+  publishGPIOStates(mqtt_client, heishamonSettings.gpioSettings, heishamonSettings.mqtt_topic_base, false);
 
 #ifdef ESP8266
 //this only runs on ESP8266, the ESP32 does this in vTask

@@ -54,19 +54,26 @@ void mqttGPIOCallback(char* topic, char* value, gpioSettingsStruct &gpioSettings
 }
 
 void publishGPIOStates(PubSubClient &mqtt_client, gpioSettingsStruct &gpioSettings, char* mqtt_topic_base, bool publishAll) {
-  static int lastState[NUMGPIO_USER];
+  static int lastState[NUMGPIO];
   static bool initialized = false;
   if (!initialized) {
-    for (int i = 0; i < NUMGPIO_USER; i++) lastState[i] = -1;
+    for (int i = 0; i < NUMGPIO; i++) lastState[i] = -1;
     initialized = true;
   }
   char topic[256];
-  for (int i = 0; i < NUMGPIO_USER; i++) {
+  char wsmsg[64];
+  bool mqttConnected = mqtt_client.connected();
+  for (int i = 0; i < NUMGPIO; i++) {
     int state = digitalRead(gpioSettings.gpioPin[i]);
     if (publishAll || state != lastState[i]) {
       lastState[i] = state;
-      snprintf_P(topic, sizeof(topic), PSTR("%s/gpio/extra/%d"), mqtt_topic_base, i + 1);
-      mqtt_client.publish(topic, state ? "1" : "0", true);
+      if (i < NUMGPIO_USER && mqttConnected) {
+        snprintf_P(topic, sizeof(topic), PSTR("%s/gpio/extra/%d"), mqtt_topic_base, i + 1);
+        mqtt_client.publish(topic, state ? "1" : "0", true);
+      }
+      int len = snprintf_P(wsmsg, sizeof(wsmsg), PSTR("{\"data\": {\"gpio\": {\"pin\": %d, \"state\": %d}}}"),
+                           gpioSettings.gpioPin[i], state);
+      websocket_write_all(wsmsg, len);
     }
   }
 }
@@ -74,10 +81,11 @@ void publishGPIOStates(PubSubClient &mqtt_client, gpioSettingsStruct &gpioSettin
 void gpioJsonOutput(struct webserver_t *client, gpioSettingsStruct &gpioSettings) {
   char buf[64];
   webserver_send_content_P(client, PSTR("["), 1);
-  for (int i = 0; i < NUMGPIO_USER; i++) {
+  for (int i = 0; i < NUMGPIO; i++) {
     int state = digitalRead(gpioSettings.gpioPin[i]);
+    int mode = (i < NUMGPIO_USER) ? gpioSettings.gpioUserMode[i] : GPIO_MODE_OUTPUT;
     int len = snprintf_P(buf, sizeof(buf), PSTR("%s{\"pin\":%d,\"mode\":%d,\"state\":%d}"),
-                         i > 0 ? "," : "", gpioSettings.gpioPin[i], gpioSettings.gpioUserMode[i], state);
+                         i > 0 ? "," : "", gpioSettings.gpioPin[i], mode, state);
     webserver_send_content(client, buf, len);
   }
   webserver_send_content_P(client, PSTR("]"), 1);
