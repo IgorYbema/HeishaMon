@@ -1685,7 +1685,7 @@ void setupConditionals() {
   );
 #endif
 
-  //send_initial_query(); //maybe necessary but for now disable. CZ-TAW1 sends this query on boot
+  send_initial_query(); //maybe necessary but for now disable. CZ-TAW1 sends this query on boot
 
   //load optional PCB data from flash
   if (heishamonSettings.optionalPCB) {
