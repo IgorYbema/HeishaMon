@@ -1,0 +1,15 @@
+# Throttle in cooling: outlet 3K below target clamps the cool request
+# to -2 and releases quiet mode to level 3.
+silent Heatpump_State 1
+silent Operating_Mode_State 1
+silent ThreeWay_Valve_State 0
+silent Quiet_Mode_Level 1
+silent Z1_Cool_Request_Temp 0
+silent Main_Target_Temp 15
+boot
+expectcmd SetMaxPumpDuty 112
+expectcmd SetPump 0
+set Main_Outlet_Temp 12
+expectcmd SetZ1CoolRequestTemperature -2
+expectcmd SetQuietMode 3
+expectnone

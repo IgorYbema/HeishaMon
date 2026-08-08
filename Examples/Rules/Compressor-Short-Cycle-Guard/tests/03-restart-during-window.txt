@@ -1,0 +1,22 @@
+# Compressor restarts and stops again inside the window: re-entry guard
+# must not arm a second suppression.
+silent Defrosting_State 0
+silent Z1_Heat_Request_Temp 0
+silent Outside_Temp 6
+boot
+adv 200
+set Compressor_Freq 40
+adv 60
+set Compressor_Freq 0
+expectcmd SetZ1HeatRequestTemperature -5
+pump
+adv 300
+set Compressor_Freq 35
+adv 60
+set Compressor_Freq 0
+expectnone
+adv 2400
+expectcmd SetZ1HeatRequestTemperature 0
+pump
+adv 600
+expectnone

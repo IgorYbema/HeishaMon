@@ -1,0 +1,16 @@
+# 8:00 with outside <12C: pump duty raised to the power profile.
+time 7 59
+silent Heatpump_State 1
+silent Operating_Mode_State 0
+silent Max_Pump_Duty 112
+silent DHW_Temp 45
+silent DHW_Target_Temp 48
+silent DHW_Heat_Delta -8
+silent Room_Thermostat_Temp 21
+silent Outside_Temp 5
+boot
+expectcmd SetMaxPumpDuty 112
+expectcmd SetPump 0
+adv 75
+expectcmd SetMaxPumpDuty 170
+expectnone

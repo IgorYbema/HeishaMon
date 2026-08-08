@@ -1,0 +1,19 @@
+# Temperature drops below 2C during an active suppression window:
+# the pending timer is re-armed to 1s and restores immediately.
+silent Defrosting_State 0
+silent Z1_Heat_Request_Temp 0
+silent Outside_Temp 5
+boot
+adv 200
+set Compressor_Freq 40
+adv 60
+set Compressor_Freq 0
+expectcmd SetZ1HeatRequestTemperature -5
+pump
+adv 600
+set Outside_Temp 1
+adv 10
+expectcmd SetZ1HeatRequestTemperature 0
+pump
+adv 5000
+expectnone

@@ -1,0 +1,11 @@
+# Reboot with stale -5 where topic values only arrive at t=40
+# (worst case after a cold boot): the 60s boot timer still sees them.
+boot
+adv 40
+silent Defrosting_State 0
+silent Outside_Temp 6
+set Z1_Heat_Request_Temp -5
+adv 300
+expectcmd SetZ1HeatRequestTemperature 0
+pump
+expectnone

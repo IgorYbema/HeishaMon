@@ -1,0 +1,7 @@
+# Boot seeds defaults: quiet pump duty and external pump request off.
+silent Operating_Mode_State 0
+silent Heatpump_State 1
+boot
+expectcmd SetMaxPumpDuty 112
+expectcmd SetPump 0
+expectnone

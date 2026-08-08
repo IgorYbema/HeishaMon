@@ -1,0 +1,16 @@
+# Compressor stops in mild weather: suppress, then restore after 45 min.
+silent Defrosting_State 0
+silent Z1_Heat_Request_Temp 0
+silent Outside_Temp 6
+boot
+adv 200
+set Compressor_Freq 40
+adv 600
+set Compressor_Freq 0
+expectcmd SetZ1HeatRequestTemperature -5
+pump
+adv 2700
+expectcmd SetZ1HeatRequestTemperature 0
+pump
+adv 600
+expectnone

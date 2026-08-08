@@ -1,0 +1,9 @@
+# Fresh boot, nothing stale: the boot cleanup timer must stay silent.
+boot
+adv 5
+silent Defrosting_State 0
+silent Z1_Heat_Request_Temp 0
+set Outside_Temp 5
+set Compressor_Freq 30
+adv 100
+expectnone

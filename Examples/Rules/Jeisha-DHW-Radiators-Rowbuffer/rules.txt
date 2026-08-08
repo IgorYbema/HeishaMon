@@ -1,0 +1,206 @@
+on System#Boot then
+   #maxPumpDutyQuiet = 112;
+   #maxPumpDutyPower = 170;
+   #maxPumpDutyBeforeDHW = #maxPumpDutyQuiet;
+   @SetMaxPumpDuty = #maxPumpDutyQuiet;
+   @SetPump = 0;
+   #stateBeforeDHW = 0;
+   #opModeBeforeDHW = 0;
+   #targetLowBeforeDHW = 31;
+   #targetHighBeforeDHW = 40;
+   #defrostWhileDHW = 1;
+   #offAtNight = 1;
+   #quietAtNight = 1;
+   #quietMinimumValue = 0;
+   #dhwStartHour = 13;
+   #dhwStarted = 0;
+   setTimer(10, 40);
+end
+
+on timer=10 then
+   setTimer(10, 30);
+   if @Operating_Mode_State < 3 && #dhwStarted == 0 then
+      #stateBeforeDHW = @Heatpump_State;
+      #opModeBeforeDHW = @Operating_Mode_State;
+      #maxPumpDutyBeforeDHW = @Max_Pump_Duty;
+      if @DHW_Temp < 20 then
+         dhw_start();
+      end
+   end
+   if %minute == 0 then
+      $hour = %hour;
+      if $hour == 8 then
+         if @Outside_Temp < 12 then
+            @SetMaxPumpDuty = #maxPumpDutyPower;
+         end
+         if @Operating_Mode_State == 0 && #offAtNight == 2 && @Heatpump_State == 0 then
+            #offAtNight = 1;
+            @SetHeatpump = 1;
+         end
+         if #quietAtNight > 0 then
+            #quietMinimumValue = 0;
+         end
+      elseif $hour == 9 && @Operating_Mode_State == 1 && #offAtNight == 2 && @Heatpump_State == 0 && @Outside_Temp > 27 then
+         #offAtNight = 1;
+         @SetHeatpump = 1;
+      elseif $hour == 18 && #offAtNight == 1 && @Heatpump_State == 1 then
+         if @Operating_Mode_State == 0 && @Room_Thermostat_Temp > 21 && @Outside_Temp > 8 then
+            #offAtNight = 2;
+         end
+         if @Operating_Mode_State == 1 then
+            #offAtNight = 2;
+            @SetHeatpump = 0;
+         end
+      elseif $hour == 19 then
+         @SetMaxPumpDuty = #maxPumpDutyQuiet;
+         if @Operating_Mode_State == 0 && #offAtNight == 2 && @Heatpump_State == 1 then
+            @SetHeatpump = 0;
+         end
+         if #quietAtNight > 0 then
+            #quietMinimumValue = #quietAtNight;
+         end
+      end
+      if $hour == #dhwStartHour && #dhwStarted == 0 && @DHW_Temp < ( @DHW_Target_Temp + @DHW_Heat_Delta ) && @Operating_Mode_State < 3 then
+         dhw_start();
+      end
+   end
+end
+on dhw_start then
+   #dhwStarted = 1;
+   @SetHeatpump = 1;
+   if @Outside_Temp < 5 then
+      @SetForceDefrost = 1;
+      setTimer(20, 540);
+   else
+      setTimer(20, 35);
+   end
+end
+
+on @DHW_Power_Consumption then
+   if @Heatpump_State == 1 && @Operating_Mode_State >= 3 && @DHW_Power_Consumption == 0 && ( @DHW_Temp >= @DHW_Target_Temp || @Main_Outlet_Temp >= @Main_Target_Temp ) then
+      setTimer(24, 1);
+   end
+end
+on @Defrosting_State then
+   if @Heatpump_State == 1 then
+      if @Defrosting_State == 1 && @ThreeWay_Valve_State == 1 then
+         #defrostWhileDHW = 2;
+         #dhwStarted = 1;
+         @SetOperationMode = 0;
+         setTimer(22, 30);
+         setTimer(23, 60);
+      elseif @Defrosting_State == 0 && #defrostWhileDHW == 2 then
+         #defrostWhileDHW = 1;
+         setTimer(20, 1);
+      end
+   end
+end
+on @ThreeWay_Valve_State then
+   if @Heatpump_State == 1 then
+      if @ThreeWay_Valve_State == 1 then
+         #dhwStarted = 1;
+         $minDHWTarget = 43;
+         $minOutside = -5;
+         $maxDHWTarget = 50;
+         $maxOutside = 30;
+         $newDHWTarget = round($minDHWTarget + ((@Outside_Temp - $minOutside) * ($maxDHWTarget - $minDHWTarget) / ($maxOutside - $minOutside)));
+         $newDHWTarget = max($minDHWTarget, $newDHWTarget);
+         $newDHWTarget = min($maxDHWTarget, $newDHWTarget);
+         if @DHW_Target_Temp != $newDHWTarget then
+            @SetDHWTemp = $newDHWTarget;
+         end
+         #targetLowBeforeDHW = @Z1_Heat_Curve_Target_Low_Temp;
+         #targetHighBeforeDHW = @Z1_Heat_Curve_Target_High_Temp;
+         setCurves(@DHW_Target_Temp + 6, @DHW_Target_Temp + 6);
+         setTimer(20, 30);
+         setTimer(21, 60);
+      elseif #defrostWhileDHW < 2 then
+         setTimer(22, 240);
+         setTimer(23, 270);
+         setTimer(24, 300);
+      end
+   end
+end
+on timer=20 then
+   @SetOperationMode = #opModeBeforeDHW + 4;
+   #dhwStarted = 0;
+end
+on timer=21 then
+   @SetMaxPumpDuty = #maxPumpDutyPower;
+   @SetPump = 1;
+end
+on timer=22 then
+   @SetZ1HeatRequestTemperature = 5;
+   setCurves(#targetHighBeforeDHW, #targetLowBeforeDHW);
+end
+on timer=23 then
+   @SetMaxPumpDuty = #maxPumpDutyBeforeDHW;
+   @SetPump = 0;
+end
+on timer=24 then
+   @SetOperationMode = #opModeBeforeDHW;
+   @SetHeatpump = #stateBeforeDHW;
+end
+on setCurves($high, $low) then
+   @SetCurves = concat('{zone1:{heat:{target:{high:', $high, ',low:', $low, '}}}}');
+end
+
+on @Main_Target_Temp then
+   throttle();
+end
+on @Main_Outlet_Temp then
+   throttle();
+end
+on @Main_Inlet_Temp then
+   throttle();
+end
+on throttle then
+   if @Heatpump_State == 1 then
+      $newQuietMode = @Quiet_Mode_Level;
+      if @Operating_Mode_State % 2 == 0 || @ThreeWay_Valve_State == 1 then
+         $roomDelta = 0;
+         if @Outside_Temp < 7 && @Room_Thermostat_Temp > 22 then
+            $roomDelta = -1;
+         end
+         $outletDeltaHeat = @Main_Outlet_Temp - @Main_Target_Temp + @Z1_Heat_Request_Temp - $roomDelta;
+         if $outletDeltaHeat < 0.3 then
+            $newQuietMode = #quietMinimumValue;
+         end
+         if $outletDeltaHeat >= 1.6 then
+            $newQuietMode = 3;
+         end
+         $newHeatRequest = floor($outletDeltaHeat) - 1;
+         $newHeatRequest = min(5, $newHeatRequest);
+         if $newHeatRequest <= 0 && ( @Main_Outlet_Temp - @Main_Target_Temp ) < 2 then
+            $newHeatRequest = $roomDelta;
+         end
+         if @Z1_Heat_Request_Temp != $newHeatRequest then
+            @SetZ1HeatRequestTemperature = $newHeatRequest;
+         end
+      else
+         $outletDeltaCool = @Main_Outlet_Temp - @Main_Target_Temp + @Z1_Cool_Request_Temp;
+         if $outletDeltaCool > 0 then
+            $newQuietMode = #quietMinimumValue;
+         end
+         if $outletDeltaCool <= -1 then
+            $newQuietMode = 3;
+         end
+         $newCoolRequest = floor($outletDeltaCool) + 1;
+         $newCoolRequest = max(-2, $newCoolRequest);
+         $newCoolRequest = min(3, $newCoolRequest);
+         if @Z1_Cool_Request_Temp != $newCoolRequest then
+            @SetZ1CoolRequestTemperature = $newCoolRequest;
+         end
+      end
+      if @Quiet_Mode_Level != $newQuietMode then
+         @SetQuietMode = $newQuietMode;
+      end
+   end
+end
+
+on @Heat_Power_Consumption then
+   if @Heatpump_State == 1 && @Operating_Mode_State == 0 && #offAtNight == 1 && @Z1_Heat_Request_Temp > 2 && @Heat_Power_Consumption == 0 && @Outside_Temp > 10 then
+      #offAtNight = 2;
+      @SetHeatpump = 0;
+   end
+end
