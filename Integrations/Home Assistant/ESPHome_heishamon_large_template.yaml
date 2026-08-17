@@ -181,7 +181,6 @@ light:
     name: "Status LED"
     pin: ${led_pin}               # GPIO42
     num_leds: 1
-    rmt_channel: 0
     chipset: WS2812
     rgb_order: GRB
     default_transition_length: 0s
@@ -253,4 +252,3 @@ ethernet:
   cs_pin: GPIO10
   interrupt_pin: GPIO15
   reset_pin: GPIO14
-  address: 1
