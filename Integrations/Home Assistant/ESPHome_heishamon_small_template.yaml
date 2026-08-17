@@ -18,12 +18,12 @@
 #   GPIO4   — 1-Wire bus (DS18B20, 4.7kΩ pull-up on PCB)
 #   GPIO12  — S0 pulse input 1  (DEFAULT_S0_PIN_1)
 #   GPIO14  — S0 pulse input 2  (DEFAULT_S0_PIN_2)
-#   GPIO3   — OpenTherm IN  (inOTPin = RX pin)
-#   GPIO1   — OpenTherm OUT (outOTPin = TX pin)
-#             ⚠ GPIO1/GPIO3 are also UART0 RX/TX (USB serial/logger).
-#             OpenTherm and USB logging cannot be used simultaneously.
-#             Set logger baud_rate: 0 when OpenTherm is active.
-#   GPIO2   — LEDPIN (blue LED, active LOW)
+#   GPIO3   — OpenTherm IN  (inOTPin)
+#   GPIO1   — OpenTherm OUT (outOTPin)
+#             GPIO1/GPIO3 are free: UART0 is on UART0_SWAP (GPIO13/15) and
+#             the logger is on UART1 (GPIO2). No conflict with OpenTherm.
+#   GPIO2   — LEDPIN (module blue LED, shared with UART1 TX / logger —
+#             not mapped in this package to avoid flashing on log output)
 #   GPIO0   — BOOTPIN (factory reset, active LOW)
 # =============================================================================
 
@@ -36,7 +36,6 @@ substitutions:
   s0_pin_2:     GPIO14
   ot_in_pin:    GPIO3
   ot_out_pin:   GPIO1
-  led_pin:      GPIO2
   boot_pin:     GPIO0
 
 esphome:
@@ -55,16 +54,21 @@ esp8266:
   restore_from_flash: true
 
 # ---------------------------------------------------------------------------
-# Logging
-# Specifying GPIO13/GPIO15 in the uart component below causes ESPHome to
-# automatically configure UART0 in swapped mode (UART0_SWAP). This means
-# UART0 is no longer available on GPIO1/GPIO3, so the logger must use UART1
-# (GPIO2, TX-only) — matching loggingSerial = Serial1 in the firmware.
-# As a bonus, GPIO1/GPIO3 are then free for OpenTherm use.
+# Logging — UART1 (GPIO2, TX-only)
+# GPIO2 is shared between UART1 TX (logger) and the module's blue LED.
+# This package defaults to serial logging. To use the status LED instead,
+# set baud_rate: 0 below and uncomment the status_led block.
 # ---------------------------------------------------------------------------
 logger:
-  baud_rate: 115200
-  hardware_uart: UART1      # GPIO2 TX-only (UART0_SWAP is taken by heatpump)
+  baud_rate: 115200       # set to 0 to free GPIO2 for the status LED below
+  hardware_uart: UART1    # GPIO2 TX-only; UART0_SWAP is taken by heatpump serial
+
+# Uncomment to use the module LED as ESPHome status indicator.
+# Requires logger baud_rate: 0 above — they share GPIO2.
+# status_led:
+#   pin:
+#     number: GPIO2
+#     inverted: true      # active LOW
 
 # ---------------------------------------------------------------------------
 # ENABLEPIN — GPIO5
@@ -104,14 +108,6 @@ one_wire:
   - platform: gpio
     pin: ${onewire_pin}     # GPIO4
     id: onewire_bus
-
-# ---------------------------------------------------------------------------
-# Status LED — LEDPIN = 2, active LOW
-# ---------------------------------------------------------------------------
-status_led:
-  pin:
-    number: ${led_pin}      # GPIO2
-    inverted: true
 
 # ---------------------------------------------------------------------------
 # Boot / factory-reset button — BOOTPIN = 0, active LOW
@@ -160,7 +156,7 @@ sensor:
         pullup: true
     name: "S0 Meter 1"
     unit_of_measurement: "W"
-    internal_filter: 13us
+    internal_filter: 13us   # debounce; unit accepted as-is in ESPHome ≥2023.x
     filters:
       - multiply: 60        # pulses/min → W; adjust multiplier for your
                             # meter's imp/kWh constant (e.g. 1000 imp/kWh → ×60)
