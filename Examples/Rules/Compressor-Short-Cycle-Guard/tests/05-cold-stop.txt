@@ -1,0 +1,11 @@
+# Compressor stop in cold weather: no suppression.
+silent Defrosting_State 0
+silent Z1_Heat_Request_Temp 0
+silent Outside_Temp -1
+boot
+adv 200
+set Compressor_Freq 40
+adv 60
+set Compressor_Freq 0
+adv 3000
+expectnone

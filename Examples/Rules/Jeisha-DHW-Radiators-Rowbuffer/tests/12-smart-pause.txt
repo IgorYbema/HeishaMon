@@ -1,0 +1,12 @@
+# Heating idles (zero heat power) with a high heat request in mild
+# weather: heat pump is paused (smart pause).
+silent Heatpump_State 1
+silent Operating_Mode_State 0
+silent Z1_Heat_Request_Temp 3
+silent Outside_Temp 12
+boot
+expectcmd SetMaxPumpDuty 112
+expectcmd SetPump 0
+set Heat_Power_Consumption 0
+expectcmd SetHeatpump 0
+expectnone

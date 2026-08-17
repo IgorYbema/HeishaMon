@@ -1,0 +1,11 @@
+# Reboot while suppression was active: pump still reports -5,
+# the 60s boot timer clears it.
+boot
+adv 5
+silent Defrosting_State 0
+silent Outside_Temp 6
+set Z1_Heat_Request_Temp -5
+adv 300
+expectcmd SetZ1HeatRequestTemperature 0
+pump
+expectnone

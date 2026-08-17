@@ -236,6 +236,8 @@ end
 ```
 
 ### Examples
+Complete, documented example rulesets live in [`Examples/Rules/`](Examples/Rules/) — each comes with a README explaining its design and a `tests/` directory of regression scenarios. The scenarios run on your PC (no device needed) through the host-side harness in [`Examples/Rules/harness/`](Examples/Rules/harness/), which compiles the real HeishaMon rules engine with plain `g++` and performs the same validation as an on-device upload, then simulates topic changes and timers while checking the commands your ruleset sends. Run all tests with `Examples/Rules/run_tests.sh`, or validate your own ruleset before uploading with `harness/harness <rules.txt> parse` — see the harness README for the scenario language.
+
 Once the rules system is in used by more and more users, additional examples will be added to the documentation.
 
 *Calculating WAR*

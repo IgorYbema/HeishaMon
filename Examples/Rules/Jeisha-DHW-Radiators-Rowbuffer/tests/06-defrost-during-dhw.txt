@@ -1,0 +1,20 @@
+# Defrost hits while the valve is on DHW: force heating mode, restore
+# request/curves after 30s; when defrost ends, DHW resumes within 1s.
+time 13 5
+silent Heatpump_State 1
+silent ThreeWay_Valve_State 1
+silent Operating_Mode_State 3
+silent DHW_Temp 45
+silent Outside_Temp 3
+boot
+expectcmd SetMaxPumpDuty 112
+expectcmd SetPump 0
+set Defrosting_State 1
+expectcmd SetOperationMode 0
+adv 30
+expectcmd SetZ1HeatRequestTemperature 5
+expectcmd SetCurves {zone1:{heat:{target:{high:40,low:31}}}}
+set Defrosting_State 0
+adv 5
+expectcmd SetOperationMode 4
+expectnone
