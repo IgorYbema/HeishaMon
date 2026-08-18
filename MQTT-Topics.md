@@ -165,6 +165,18 @@ TOP143 | main/DHW_Sensor_Selection | DHW tank sensor selection (0=Top, 1=Center)
 
 All Topics related with state can have also value -1 - unknown - but only in abnormal situations.
 
+## Extra Sensor Topics:
+Some heatpumps (K/L series and newer) send an additional "extra data block" on top of the normal data block. HeishaMon detects this automatically at boot and, if available, starts requesting and decoding it as well. These extra topics provide separate, more precise power consumption/production values (Watt) per mode, published under the `extra/` topic prefix. If your heatpump does not support the extra data block, these topics will not be published.
+
+ID | Topic | Response/Description
+:--- | --- | ---
+XTOP0 | extra/Heat_Power_Consumption_Extra | Electrical heat power consumption (Watt)
+XTOP1 | extra/Cool_Power_Consumption_Extra | Electrical cooling power consumption (Watt)
+XTOP2 | extra/DHW_Power_Consumption_Extra | Electrical DHW power consumption (Watt)
+XTOP3 | extra/Heat_Power_Production_Extra | Thermal heat power production (Watt)
+XTOP4 | extra/Cool_Power_Production_Extra | Thermal cooling power production (Watt)
+XTOP5 | extra/DHW_Power_Production_Extra | Thermal DHW power production (Watt)
+
 ## Option PCB Topics:
 The following topics are actions from the heatpump to the optional pcb (for example, start pump on zone 2). This is only available if you have enable optional pcb emulation.
 These values are not visible if you have the real optional pcb installed.
