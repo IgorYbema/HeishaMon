@@ -27,7 +27,7 @@ Serial 1 (GPIO2) can be used to connect another serial line (GND and TX from the
 
 All received data will be sent to different MQTT topics (see below for topic descriptions). There is also a 'panasonic_heat_pump/log' MQTT topic which provides debug logging and a hexdump of the received packets (if enabled in the web portal).
 
-Some heatpumps (K/L series and newer) also send an additional "extra data block" with separate, more precise power consumption/production values. HeishaMon detects this automatically at boot and, if supported, publishes these as XTOP topics under 'panasonic_heat_pump/extra/...' (see [MQTT-Topics.md](MQTT-Topics.md) for the full list). If your heatpump doesn't support this extra data block, these topics simply won't appear.
+Some heatpumps (K/L series and newer) also send an additional "extra data block" with separate, more precise power consumption/production values. HeishaMon detects this automatically at boot and, if supported, publishes these as XTOP topics under 'panasonic_heat_pump/extra/...' (see [MQTT-Topics.md](MQTT-Topics.md) for the full list). If your heatpump doesn't support this extra data block, these topics simply won't appear. Note that on heatpumps that do support it, the "old" power topics (TOP15/16, TOP38-41, see MQTT-Topics.md) are no longer populated by the heatpump and will report bogus/invalid values (e.g. -200) — use the XTOP power values instead in that case.
 
 You can connect a 1wire network on GPIO4 which will report in seperate MQTT topics (panasonic_heat_pump/1wire/sensorid).
 
