@@ -200,6 +200,7 @@ void check_wifi() {
     // special case where it seems that we are not connect but we do have working IP (causing the -1% wifi signal), do a reset.
     log_message(_F("Weird case, WiFi seems disconnected but is not. Resetting WiFi!"));
     setupWifi(&heishamonSettings);
+    lastWifiRetryTimer = millis();
   } else if ((wifistatus != WL_CONNECTED) || (!WiFi.localIP())) {
     /*
         if we are not connected to an AP
@@ -286,6 +287,12 @@ void check_wifi() {
 }
 #elif defined(ESP32)
 void check_wifi() {
+  if (doInitialWifiScan && (millis() > 15000)) {  //do a wifi scan at boot after 15 seconds so the settings page dropdown is already populated on first view
+    doInitialWifiScan = false;
+    log_message(_F("Starting initial wifi scan ..."));
+    WiFi.scanNetworks(true);
+  }
+
   wl_status_t wifistatus = WiFi.status();
   bool ethUp = ETH.hasIP();
   bool wifiUp = (wifistatus == WL_CONNECTED);
@@ -1731,6 +1738,7 @@ void timer_cb(int nr) {
         } break;
       case -3: {
           setupWifi(&heishamonSettings);
+          lastWifiRetryTimer = millis(); // give the new STA connection attempt a full WIFIRETRYTIMER window before check_wifi() can re-enable the hotspot
         } break;
       case -4: {
           int ret = rules_parse((char*)"/rules.new");
