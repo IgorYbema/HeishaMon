@@ -357,6 +357,9 @@ void check_wifi() {
   // If AP client is connected, STA must back off
   if (WiFi.softAPgetStationNum() > 0) {
     if (WiFi.getMode() != WIFI_AP) {
+      if (WiFi.scanComplete() == WIFI_SCAN_RUNNING) {
+        return; // let a pending wifi scan finish before dropping STA, otherwise it never gets a result
+      }
       log_message(_F("SoftAP client active, suspending STA reconnect"));
 	    WiFi.disconnect(true);
 	    WiFi.mode(WIFI_AP);
@@ -380,9 +383,12 @@ void check_wifi() {
 
   // Disable STA so next retry is clean and we wait WIFIRETRYTIMER so hotspot can do its thing
   if (WiFi.getMode() != WIFI_AP) {
-    log_message(_F("Disabling WiFi STA for a while..."));	
+    if (WiFi.scanComplete() == WIFI_SCAN_RUNNING) {
+      return; // let a pending wifi scan finish before dropping STA, otherwise it never gets a result
+    }
+    log_message(_F("Disabling WiFi STA for a while..."));
 	  WiFi.disconnect(true);
-    WiFi.mode(WIFI_AP); 
+    WiFi.mode(WIFI_AP);
     return;
   }
 
