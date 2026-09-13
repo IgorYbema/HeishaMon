@@ -2429,7 +2429,7 @@ static const char webBodySettingsNewWifiWarning[] FLASHPROG = R"====(
   <h2>Reconfiguring WiFi</h2>
   <p>Attempting to connect to the new access point.<br><br>
   The <strong style='color:var(--text-primary)'>Heishamon-Setup</strong> hotspot will be brought down automatically on success.<br><br>
-  This page will redirect to home shortly.</p>
+  This page will redirect to the device's new address shortly.</p>
 </div>
 )====";
 
