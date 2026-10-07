@@ -924,6 +924,7 @@ void serialTXTask(void *pvParameters) {
   }
 }
 bool send_command(byte* command, int length) {
+  if (length <= 0) return false;
   if ( heishamonSettings.listenonly ) {
     log_message(_F("Not sending this command. Heishamon in listen only mode!"));
     return false;
@@ -938,6 +939,7 @@ bool send_command(byte* command, int length) {
 #else
 
 bool send_command(byte* command, int length) {
+  if (length <= 0) return false;
   if ( heishamonSettings.listenonly ) {
     log_message(_F("Not sending this command. Heishamon in listen only mode!"));
     return false;
