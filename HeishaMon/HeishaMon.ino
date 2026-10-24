@@ -515,10 +515,12 @@ void mqtt_reconnect()
         if (s0_restore_pending(1)) {
           sprintf_P(mqtt_topic, PSTR("%s/%s/WatthourTotal/1"), heishamonSettings.mqtt_topic_base, mqtt_topic_s0);
           mqtt_client.subscribe(mqtt_topic);
+          s0_restore_subscribed(1);
         }
         if (s0_restore_pending(2)) {
           sprintf_P(mqtt_topic, PSTR("%s/%s/WatthourTotal/2"), heishamonSettings.mqtt_topic_base, mqtt_topic_s0);
           mqtt_client.subscribe(mqtt_topic);
+          s0_restore_subscribed(2);
         }
       }
       if (heishamonSettings.use_1wire && mqttReconnects == 1) { // only on first connect: retrieve previously known 1wire sensors from their retained mqtt topics
