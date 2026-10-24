@@ -95,9 +95,17 @@ void initS0Sensors(s0SettingsStruct s0Settings[]) {
   actS0Data[1].nextReport = millis() + MINREPORTEDS0TIME; //initial report after interval, not directly at boot
 }
 
-void restore_s0_Watthour(int s0Port, float watthour) {
-  if ((s0Port == 1) || (s0Port == 2)) {
-    unsigned long newTotal = (unsigned long)(watthour * (actS0Settings[s0Port - 1].ppkwh / 1000.0));
+//the total is restored from the retained mqtt value only once after boot
+bool s0RestorePending[NUM_S0_COUNTERS] = {true, true};
+
+bool s0_restore_pending(int s0Port) {
+  return ((s0Port == 1) || (s0Port == 2)) && s0RestorePending[s0Port - 1];
+}
+
+void restore_s0_Watthour(int s0Port, double watthour) {
+  if (s0_restore_pending(s0Port)) { //ignore later values on this topic, a wrong retained value would otherwise raise the total on each mqtt reconnect
+    s0RestorePending[s0Port - 1] = false;
+    unsigned long newTotal = (unsigned long)(watthour * (actS0Settings[s0Port - 1].ppkwh / 1000.0) + 0.5);
     if (newTotal > actS0Data[s0Port - 1].pulsesTotal) {
       noInterrupts();
       actS0Data[s0Port - 1].pulsesTotal = newTotal;
@@ -134,8 +142,9 @@ void s0Loop(PubSubClient &mqtt_client, void (*log_message)(char*), char* mqtt_to
         }
       }
 
-      float Watthour = (actS0Data[i].pulses * ( 1000.0 / actS0Settings[i].ppkwh));
-      float WatthourTotal = (actS0Data[i].pulsesTotal * ( 1000.0 / actS0Settings[i].ppkwh));
+      //double, because a float loses whole Wh above 16777216 Wh
+      double Watthour = (actS0Data[i].pulses * ( 1000.0 / actS0Settings[i].ppkwh));
+      double WatthourTotal = (actS0Data[i].pulsesTotal * ( 1000.0 / actS0Settings[i].ppkwh));
 
       noInterrupts();
       actS0Data[i].pulses = 0; //per message we report new wattHour, so pulses should be zero at start new message
