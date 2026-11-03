@@ -10,12 +10,16 @@
 #define DEFAULT_S0_PIN_2 2 
 #endif
 
+#define S0_MODE_PULSEWIDTH 0 //count a pulse when the time between two edges is between min and max pulse width (S0 meters)
+#define S0_MODE_DEBOUNCED 1 //count once each time the input settles low for at least min pulse width (Ferraris disc with reflective sensor)
+
 struct s0SettingsStruct {
   byte gpiopin = 255;
   unsigned int ppkwh = 1000; //pulses per Wh of the connected meter
   unsigned int lowerPowerInterval = 60; //configurabel low power interval
   unsigned int minimalPulseWidth = 25; //configurabel minimal s0 pulse width
   unsigned int maximalPulseWidth = 100; //configurabel maximal s0 pulse width
+  unsigned int mode = S0_MODE_PULSEWIDTH; //how pulses are counted, see S0_MODE_*
 };
 
 struct s0DataStruct {

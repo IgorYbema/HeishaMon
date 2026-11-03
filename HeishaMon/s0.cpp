@@ -24,7 +24,52 @@ volatile bool badEdge[NUM_S0_COUNTERS] = {0, 0}; //two edges is a pulse, so stor
   volatile int allLastEdgeS0Index[2] = {0, 0};
 */
 
+//debounced mode: level the input had since the last edge, and the last level that was stable for at least the minimal pulse width
+volatile uint8_t lastLevelS0[NUM_S0_COUNTERS] = {HIGH, HIGH};
+volatile uint8_t stableLevelS0[NUM_S0_COUNTERS] = {2, 2}; //2 is unknown, no stable level seen since boot
+
+IRAM_ATTR void registerGoodPulse(int i, unsigned long pulseTime, unsigned long pulseWidth) {
+  if (actS0Data[i].lastPulse > 0) { //Do not calculate watt for the first pulse since reboot because we will always report a too high watt. Better to show 0 watt at first pulse.
+    volatile unsigned long pulseInterval = pulseTime - actS0Data[i].lastPulse; //calculate the interval between last valid pulse edge and this edge
+    actS0Data[i].watt = (3600000000.0 / pulseInterval) / actS0Settings[i].ppkwh;
+    if ((unsigned long)(actS0Data[i].nextReport - pulseTime) > MINREPORTEDS0TIME) { //pulse seen in standby interval so report directly
+      actS0Data[i].nextReport = 0; // report now
+    }
+  }
+  actS0Data[i].lastPulse = pulseTime; // store this edge to compare in next pulses for valid pulse and calculate watt
+  actS0Data[i].pulses++;
+  actS0Data[i].pulsesTotal++;
+  actS0Data[i].goodPulses++;
+  actS0Data[i].avgPulseWidth = ((actS0Data[i].avgPulseWidth * (actS0Data[i].goodPulses - 1)) + pulseWidth ) / actS0Data[i].goodPulses;
+}
+
+// Debounced mode, for slow and noisy signals like a reflective sensor on a Ferraris disc.
+// A level only counts once it was stable for at least the minimal pulse width; shorter
+// segments (comparator chatter at the edge of the mark) are ignored. One pulse is counted
+// each time the stable level changes to low, so each mark gives exactly one pulse whatever
+// its width. There is no maximal pulse width. A stable segment is only known when it ends,
+// so the pulse is registered at the first edge after the low segment.
+IRAM_ATTR void countDebouncedEdge(int i) {
+  unsigned long newEdgeS0 = millis();
+  unsigned long segmentWidth = newEdgeS0 - lastEdgeS0[i];
+  uint8_t segmentLevel = lastLevelS0[i];
+  if (segmentWidth >= actS0Settings[i].minimalPulseWidth) {
+    if (segmentLevel != stableLevelS0[i]) {
+      if ((segmentLevel == LOW) && (stableLevelS0[i] != 2)) registerGoodPulse(i, newEdgeS0, segmentWidth);
+      stableLevelS0[i] = segmentLevel;
+    } else {
+      actS0Data[i].badPulses++; //same stable level as before, so the edges in between were a glitch
+    }
+  }
+  lastLevelS0[i] = digitalRead(actS0Settings[i].gpiopin);
+  lastEdgeS0[i] = newEdgeS0;
+}
+
 IRAM_ATTR void countPulse(int i) {
+  if (actS0Settings[i].mode == S0_MODE_DEBOUNCED) {
+    countDebouncedEdge(i);
+    return;
+  }
   volatile unsigned long newEdgeS0 = millis();
   volatile unsigned long curPulseWidth = newEdgeS0 - lastEdgeS0[i];
   // debug
@@ -36,18 +81,7 @@ IRAM_ATTR void countPulse(int i) {
   */
   // end debug
   if ((curPulseWidth >=  actS0Settings[i].minimalPulseWidth) && (curPulseWidth <= actS0Settings[i].maximalPulseWidth) ) {
-    if (actS0Data[i].lastPulse > 0) { //Do not calculate watt for the first pulse since reboot because we will always report a too high watt. Better to show 0 watt at first pulse.
-      volatile unsigned long pulseInterval = newEdgeS0 - actS0Data[i].lastPulse; //calculate the interval between last valid pulse edge and this edge
-      actS0Data[i].watt = (3600000000.0 / pulseInterval) / actS0Settings[i].ppkwh;
-      if ((unsigned long)(actS0Data[i].nextReport - newEdgeS0) > MINREPORTEDS0TIME) { //pulse seen in standby interval so report directly
-        actS0Data[i].nextReport = 0; // report now
-      }
-    }
-    actS0Data[i].lastPulse = newEdgeS0; // store this edge to compare in next pulses for valid pulse and calculate watt
-    actS0Data[i].pulses++;
-    actS0Data[i].pulsesTotal++;
-    actS0Data[i].goodPulses++;
-    actS0Data[i].avgPulseWidth = ((actS0Data[i].avgPulseWidth * (actS0Data[i].goodPulses - 1)) + curPulseWidth ) / actS0Data[i].goodPulses;
+    registerGoodPulse(i, newEdgeS0, curPulseWidth);
     badEdge[i] = false; //set it to false again to allow to count two bad edges as a new bad pulse because we know we had a good pulse now
   } else {
     if (badEdge[i]) actS0Data[i].badPulses++; //there was already an edge before so count this one as a bad pulse
@@ -75,8 +109,11 @@ void initS0Sensors(s0SettingsStruct s0Settings[]) {
   actS0Settings[0].lowerPowerInterval = s0Settings[0].lowerPowerInterval;
   actS0Settings[0].minimalPulseWidth = s0Settings[0].minimalPulseWidth;
   actS0Settings[0].maximalPulseWidth = s0Settings[0].maximalPulseWidth;
+  actS0Settings[0].mode = s0Settings[0].mode;
 
   pinMode(actS0Settings[0].gpiopin, INPUT_PULLUP);
+  lastLevelS0[0] = digitalRead(actS0Settings[0].gpiopin);
+  lastEdgeS0[0] = millis();
   attachInterrupt(digitalPinToInterrupt(actS0Settings[0].gpiopin), onS0Pulse1Change, CHANGE);
   actS0Data[0].nextReport = millis() + MINREPORTEDS0TIME; //initial report after interval, not directly at boot
 
@@ -89,8 +126,11 @@ void initS0Sensors(s0SettingsStruct s0Settings[]) {
   actS0Settings[1].lowerPowerInterval = s0Settings[1].lowerPowerInterval;
   actS0Settings[1].minimalPulseWidth = s0Settings[1].minimalPulseWidth;
   actS0Settings[1].maximalPulseWidth = s0Settings[1].maximalPulseWidth;
+  actS0Settings[1].mode = s0Settings[1].mode;
 
   pinMode(actS0Settings[1].gpiopin, INPUT_PULLUP);
+  lastLevelS0[1] = digitalRead(actS0Settings[1].gpiopin);
+  lastEdgeS0[1] = millis();
   attachInterrupt(digitalPinToInterrupt(actS0Settings[1].gpiopin), onS0Pulse2Change, CHANGE);
   actS0Data[1].nextReport = millis() + MINREPORTEDS0TIME; //initial report after interval, not directly at boot
 }

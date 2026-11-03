@@ -275,11 +275,13 @@ void loadSettings(settingsStruct *heishamonSettings) {
           if (jsonDoc[F("s0_1_interval")]) heishamonSettings->s0Settings[0].lowerPowerInterval = jsonDoc[F("s0_1_interval")];
           if (jsonDoc[F("s0_1_minpulsewidth")]) heishamonSettings->s0Settings[0].minimalPulseWidth = jsonDoc[F("s0_1_minpulsewidth")];
           if (jsonDoc[F("s0_1_maxpulsewidth")]) heishamonSettings->s0Settings[0].maximalPulseWidth = jsonDoc[F("s0_1_maxpulsewidth")];
+          if (jsonDoc[F("s0_1_mode")]) heishamonSettings->s0Settings[0].mode = jsonDoc[F("s0_1_mode")];
           //if (jsonDoc[F("s0_2_gpio")]) heishamonSettings->s0Settings[1].gpiopin = jsonDoc[F("s0_2_gpio")];
           if (jsonDoc[F("s0_2_ppkwh")]) heishamonSettings->s0Settings[1].ppkwh = jsonDoc[F("s0_2_ppkwh")];
           if (jsonDoc[F("s0_2_interval")] ) heishamonSettings->s0Settings[1].lowerPowerInterval = jsonDoc[F("s0_2_interval")];
           if (jsonDoc[F("s0_2_minpulsewidth")]) heishamonSettings->s0Settings[1].minimalPulseWidth = jsonDoc[F("s0_2_minpulsewidth")];
           if (jsonDoc[F("s0_2_maxpulsewidth")]) heishamonSettings->s0Settings[1].maximalPulseWidth = jsonDoc[F("s0_2_maxpulsewidth")];
+          if (jsonDoc[F("s0_2_mode")]) heishamonSettings->s0Settings[1].mode = jsonDoc[F("s0_2_mode")];
           ntpReload(heishamonSettings);
         } else {
           log_message(_F("Failed to load json config, forcing config reset."));
@@ -505,10 +507,12 @@ void settingsToJson(JsonDocument &jsonDoc, settingsStruct *heishamonSettings) {
   jsonDoc[F("s0_1_interval")] = heishamonSettings->s0Settings[0].lowerPowerInterval;
   jsonDoc[F("s0_1_minpulsewidth")] = heishamonSettings->s0Settings[0].minimalPulseWidth;
   jsonDoc[F("s0_1_maxpulsewidth")] = heishamonSettings->s0Settings[0].maximalPulseWidth;
+  jsonDoc[F("s0_1_mode")] = heishamonSettings->s0Settings[0].mode;
   jsonDoc[F("s0_2_ppkwh")] = heishamonSettings->s0Settings[1].ppkwh;
   jsonDoc[F("s0_2_interval")] = heishamonSettings->s0Settings[1].lowerPowerInterval;
   jsonDoc[F("s0_2_minpulsewidth")] = heishamonSettings->s0Settings[1].minimalPulseWidth;
-  jsonDoc[F("s0_2_maxpulsewidth")] = heishamonSettings->s0Settings[1].maximalPulseWidth;  
+  jsonDoc[F("s0_2_maxpulsewidth")] = heishamonSettings->s0Settings[1].maximalPulseWidth;
+  jsonDoc[F("s0_2_mode")] = heishamonSettings->s0Settings[1].mode;
 }
 
 void saveJsonToFile(JsonDocument &jsonDoc, const char* filename) {
@@ -719,6 +723,8 @@ int saveSettings(struct webserver_t *client, settingsStruct *heishamonSettings) 
       jsonDoc[F("s0_1_minpulsewidth")] = tmp->value;
     } else if (strcmp(tmp->name.c_str(), "s0_1_maxpulsewidth") == 0) {
       jsonDoc[F("s0_1_maxpulsewidth")] = tmp->value;
+    } else if (strcmp(tmp->name.c_str(), "s0_1_mode") == 0) {
+      jsonDoc[F("s0_1_mode")] = tmp->value;
     } else if (strcmp(tmp->name.c_str(), "s0_2_ppkwh") == 0) {
       jsonDoc[F("s0_2_ppkwh")] = tmp->value;
     } else if (strcmp(tmp->name.c_str(), "s0_2_ppkwh") == 0) {
@@ -729,6 +735,8 @@ int saveSettings(struct webserver_t *client, settingsStruct *heishamonSettings) 
       jsonDoc[F("s0_2_minpulsewidth")] = tmp->value;
     } else if (strcmp(tmp->name.c_str(), "s0_2_maxpulsewidth") == 0) {
       jsonDoc[F("s0_2_maxpulsewidth")] = tmp->value;
+    } else if (strcmp(tmp->name.c_str(), "s0_2_mode") == 0) {
+      jsonDoc[F("s0_2_mode")] = tmp->value;
     }
     tmp = tmp->next;
   }
