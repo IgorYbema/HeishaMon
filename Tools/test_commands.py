@@ -125,6 +125,8 @@ bool send_command(byte* data, int length) {
   ++send_count; sent.assign(data, data + length); return true;
 }
 void log_message(char*) {}
+std::vector<std::pair<std::string, std::string>> reports;
+void report(const char *name, const char *value) { reports.emplace_back(name, value); }
 """
 
 # one command through the real dispatcher: value None = refused, nothing sent and the buffer left untouched
@@ -236,6 +238,81 @@ GATE = r"""
     const cmdStruct offset = { "SetOffset", 0, CMD_DECIMAL(35, 4, -35, 35, 5, 5, 8) };
     byte buffer[256]; char log[256] = { 0 }; char payload[] = "-3.5";
     assert(heatpump_command(&offset, payload, buffer, log) != 0 && strcmp(log, "SetOffset set to -3.5") == 0);
+  }
+  // decode_command() gives back the name and payload of every command
+  { const char *payloads[] = { "1", "2", "3", "5", "-5", "21", "30", "60", "75" };
+    unsigned int roundtrips = 0;
+    for (unsigned int i = 0; i < sizeof(commands) / sizeof(commands[0]); i++) {
+      if (commands[i].func == set_curves) continue;
+      for (const char *text : payloads) {
+        byte buffer[256]; char log[256]; char payload[16];
+        strcpy(payload, text);
+        if (heatpump_command(&commands[i], payload, buffer, log) == 0) continue;  // refused
+        reports.clear();
+        unsigned int count = decode_command(buffer, sizeof(panasonicSendQuery), report);
+        // a payload outside the field is sent as something else, the log shows what
+        const std::string sentAs = strrchr(log, ' ') + 1;
+        const bool same = commands[i].type == CMD_FUNC ? count == 1 : sentAs == text;
+        if (!same) continue;
+        if (count != 1 || reports[0].first != commands[i].name || reports[0].second != text) {
+          printf("FAIL decode %s '%s': %u reports, first %s = %s\n", commands[i].name, text, count,
+                 count ? reports[0].first.c_str() : "-", count ? reports[0].second.c_str() : "-");
+          exit(1);
+        }
+        roundtrips++;
+      }
+    }
+    assert(roundtrips > 150);
+    byte buffer[256];
+    memcpy(buffer, panasonicSendQuery, sizeof(panasonicSendQuery));
+    reports.clear();
+    assert(decode_command(buffer, sizeof(panasonicSendQuery), report) == 0 && reports.empty());  // nothing set
+    assert(decode_command(buffer, sizeof(panasonicSendQuery) - 1, report) == 0);  // not a command datagram
+    // several settings in one datagram, with bits no command describes
+    buffer[4] = 0x02 | 0x20;  // SetHeatpump 1, SetPump 1
+    buffer[6] = 34 | 128;     // SetOperationMode 4, SetZones 1
+    buffer[7] = 0x10 | 0x80;  // SetQuietMode 1, SetQuietModeSchedule 1
+    buffer[42] = 128 + 55;    // SetDHWTemp 55
+    buffer[60] = 0x12;        // unknown
+    buffer[8] = 0x80 | 0x01;  // unknown bit, SetReset 1
+    reports.clear();
+    assert(decode_command(buffer, sizeof(panasonicSendQuery), report) == 10);
+    const std::vector<std::pair<std::string, std::string>> expected = {
+      { "SetHeatpump", "1" }, { "SetPump", "1" }, { "SetQuietMode", "1" }, { "SetDHWTemp", "55" }, { "SetReset", "1" },
+      { "SetQuietModeSchedule", "1" }, { "SetOperationMode", "4" }, { "SetZones", "1" }, { "Byte8", "0x80" }, { "Byte60", "0x12" },
+    };
+    if (reports != expected) {
+      for (auto &r : reports) printf("  %s = %s\n", r.first.c_str(), r.second.c_str());
+      fail("decode", "combined", "unexpected reports");
+    }
+    // an operation mode byte that SetOperationMode can't send
+    memcpy(buffer, panasonicSendQuery, sizeof(panasonicSendQuery));
+    buffer[6] = 17;
+    reports.clear();
+    assert(decode_command(buffer, sizeof(panasonicSendQuery), report) == 1);
+    assert(reports[0].first == "Byte6" && reports[0].second == "0x11");
+    // curves as the JSON SetCurves takes
+    struct { std::vector<std::pair<int, int>> bytes; const char *json; } curves[] = {
+      { { { 75, 128 + 45 } }, "{\"zone1\":{\"heat\":{\"target\":{\"high\":45}}}}" },
+      { { { 75, 128 + 45 }, { 76, 128 + 25 }, { 77, 128 - 15 }, { 78, 128 + 15 } },
+        "{\"zone1\":{\"heat\":{\"target\":{\"high\":45,\"low\":25},\"outside\":{\"low\":-15,\"high\":15}}}}" },
+      { { { 78, 128 + 15 }, { 86, 128 + 20 }, { 82, 128 + 12 }, { 93, 128 + 30 } },
+        "{\"zone1\":{\"heat\":{\"outside\":{\"high\":15}},\"cool\":{\"target\":{\"high\":20}}},"
+        "\"zone2\":{\"heat\":{\"outside\":{\"high\":12}},\"cool\":{\"outside\":{\"high\":30}}}}" },
+    };
+    for (auto &c : curves) {
+      memcpy(buffer, panasonicSendQuery, sizeof(panasonicSendQuery));
+      for (auto &b : c.bytes) buffer[b.first] = b.second;
+      reports.clear();
+      assert(decode_command(buffer, sizeof(panasonicSendQuery), report) == 1);
+      if (reports[0].first != "SetCurves" || reports[0].second != c.json) fail("SetCurves", reports[0].second.c_str(), c.json);
+    }
+    // all 16 points fit the buffer
+    memcpy(buffer, panasonicSendQuery, sizeof(panasonicSendQuery));
+    for (int i = 75; i <= 93; i++) if (i < 83 || i > 85) buffer[i] = 128 - 100;
+    reports.clear();
+    assert(decode_command(buffer, sizeof(panasonicSendQuery), report) == 1);
+    assert(reports[0].second.size() > 300 && reports[0].second.back() == '}' && reports[0].second[reports[0].second.size() - 2] == '}');
   }
   for (unsigned int i = 0; i < sizeof(commands) / sizeof(commands[0]); i++) {
     if (commands[i].type == CMD_FUNC) continue;

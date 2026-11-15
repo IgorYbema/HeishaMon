@@ -92,6 +92,8 @@ unsigned int set_zones(char *msg, unsigned char *cmd, char *log_msg);
 // Build the datagram of a main command from its payload. Returns the length to send, 0 when the payload is refused.
 unsigned int heatpump_command(const cmdStruct *command, char *msg, unsigned char *cmd, char *log_msg);
 void setInstallerCommandsAllowed(bool allowed);
+// The reverse: report every setting a command datagram holds as name and payload. Returns the number of reports.
+unsigned int decode_command(const unsigned char *cmd, unsigned int length, void (*report)(const char *name, const char *value));
 
 //optional pcb commands
 unsigned int set_heat_cool_mode(char *msg, char *log_msg);

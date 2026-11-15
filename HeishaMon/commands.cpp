@@ -208,6 +208,117 @@ unsigned int set_zones(char *msg, unsigned char *cmd, char *log_msg) {
   return sizeof(panasonicSendQuery);
 }
 
+// The reverse of the commands above: what does a command datagram ask for?
+
+// The curve points of a datagram as the JSON that SetCurves takes, only the points that are set.
+static void curves_json(const unsigned char *cmd, char *json, size_t size) {
+  size_t used = 0;
+  bool anyZone = false;
+  auto add = [&](const char *text) {
+    if (used < size) used += snprintf(json + used, size - used, "%s", text);
+  };
+  add("{");
+  for (int zone = 0; zone < 2; zone++) {
+    bool zoneOpen = false;
+    for (int cool = 0; cool < 2; cool++) {
+      bool modeOpen = false;
+      for (int outside = 0; outside < 2; outside++) {
+        bool groupOpen = false;
+        for (int point = 0; point < 2; point++) {
+          const unsigned char value = cmd[(cool ? 86 : 75) + zone * 4 + outside * 2 + point];
+          if (value == 0) continue;
+          if (!zoneOpen) {
+            if (anyZone) add(",");
+            add(zone ? "\"zone2\":{" : "\"zone1\":{");
+          }
+          if (!modeOpen) {
+            if (zoneOpen) add(",");
+            add(cool ? "\"cool\":{" : "\"heat\":{");
+          }
+          if (groupOpen || modeOpen) add(",");
+          if (!groupOpen) add(outside ? "\"outside\":{" : "\"target\":{");
+          // target is stored high, low and outside low, high
+          add(outside == point ? "\"high\":" : "\"low\":");
+          char number[8];
+          snprintf(number, sizeof(number), "%d", value - 128);
+          add(number);
+          zoneOpen = modeOpen = groupOpen = anyZone = true;
+        }
+        if (groupOpen) add("}");
+      }
+      if (modeOpen) add("}");
+    }
+    if (zoneOpen) add("}");
+  }
+  add("}");
+}
+
+// Report every setting a command datagram holds, as the command name and the payload that builds it. Bits that
+// no command describes are reported as "Byte<n>" with their value in hex. Returns the number of reports.
+unsigned int decode_command(const unsigned char *cmd, unsigned int length, void (*report)(const char *name, const char *value)) {
+  if (length != sizeof(panasonicSendQuery)) return 0;
+  unsigned char known[sizeof(panasonicSendQuery)] = { 0 };  // the bits a command describes
+  char value[400];
+  unsigned int count = 0;
+
+  for (unsigned int i = 0; i < sizeof(commands) / sizeof(commands[0]); i++) {
+    cmdStruct command;
+    memcpy_P(&command, &commands[i], sizeof(command));
+    if (command.type == CMD_FUNC) continue;
+    known[command.address] |= (unsigned char)(command.mask << command.shift);
+    const long field = (cmd[command.address] >> command.shift) & command.mask;
+    if (field == 0) continue;  // not set
+    const long number = (field - command.offset) * command.divisor;
+    if (command.type == CMD_TENTHS) {
+      snprintf_P(value, sizeof(value), PSTR("%.1f"), number / 10.0);
+    } else {
+      snprintf_P(value, sizeof(value), PSTR("%ld"), number);
+    }
+    report(command.name, value);
+    count++;
+  }
+
+  // SetOperationMode and SetZones share byte 6
+  static const unsigned char modes[] = { 18, 19, 24, 33, 34, 35, 40 };
+  for (unsigned int mode = 0; mode < sizeof(modes); mode++) {
+    if ((cmd[6] & 0x3F) != modes[mode]) continue;
+    snprintf_P(value, sizeof(value), PSTR("%u"), mode);
+    report("SetOperationMode", value);
+    count++;
+    known[6] |= 0x3F;
+  }
+  if (cmd[6] & 0xC0) {
+    snprintf_P(value, sizeof(value), PSTR("%d"), (cmd[6] >> 6) - 1);
+    report("SetZones", value);
+    count++;
+  }
+  known[6] |= 0xC0;
+
+  // SetCurves: z1 and z2 heat in bytes 75-82, z1 and z2 cool in bytes 86-93
+  bool curves = false;
+  for (unsigned int i = 75; i <= 93; i++) {
+    if (i >= 83 && i <= 85) continue;
+    known[i] = 0xFF;
+    if (cmd[i] != 0) curves = true;
+  }
+  if (curves) {
+    curves_json(cmd, value, sizeof(value));
+    report("SetCurves", value);
+    count++;
+  }
+
+  for (unsigned int i = 4; i < length; i++) {  // the first four bytes are the header
+    const unsigned char unknown = cmd[i] & ~known[i];
+    if (unknown == 0) continue;
+    char name[8];
+    snprintf_P(name, sizeof(name), PSTR("Byte%u"), i);
+    snprintf_P(value, sizeof(value), PSTR("0x%02X"), unknown);
+    report(name, value);
+    count++;
+  }
+  return count;
+}
+
 //start of optional pcb commands
 unsigned int set_byte_6(int val, int base, int bit, char *log_msg, const char *func) {
   unsigned char hex = (optionalPCBQuery[6] & ~(base << bit)) | (val << bit);

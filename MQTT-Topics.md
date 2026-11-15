@@ -41,6 +41,17 @@ ID | Topic | Response
 --- | --- | ---
 LOG1 | log | response from headpump (level switchable)
 
+## CZ-TAW1 Proxy Topics:
+
+Large (ESP32) board with a CZ-TAW1 on the proxy port only. Every settings change the CZ-TAW1 (Panasonic cloud) sends is decoded and published, one message per setting. The name and value are the same as for the [command topics](#command-topics): a cloud request for 50°C DHW is published as `proxy/forwarded/SetDHWTemp` with value `50`. A part of the request that HeishaMon can't decode is published as `Byte<n>` with its value in hex. The messages are not retained.
+
+With the setting *Block settings changes from CZ-TAW1* enabled the request is not passed to the heat pump and is published under `proxy/blocked` instead. The CZ-TAW1 can still read the heat pump.
+
+ID | Topic | Response
+--- | --- | ---
+PRX1 | proxy/forwarded/&lt;command&gt; | value the CZ-TAW1 has set
+PRX2 | proxy/blocked/&lt;command&gt; | value the CZ-TAW1 tried to set while its changes are blocked
+
 ## Sensor Topics:
 
 ID | Topic | Response/Description
